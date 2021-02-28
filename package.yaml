@@ -1,0 +1,141 @@
+name: unnamed
+version: 0.0.0
+author: Szumi Xie <szumixie@gmail.com>
+github: szumixie/unnamed
+
+extra-doc-files:
+  - README.md
+
+ghc-options:
+  - -Wall
+  - -Wcompat
+  - -Wincomplete-uni-patterns
+  - -Wincomplete-record-updates
+  - -Wmissing-export-lists
+  - -Widentities
+  - -Wredundant-constraints
+  - -Wpartial-fields
+  - -Wmissing-deriving-strategies
+
+default-extensions:
+  - RecursiveDo
+  - TupleSections
+  - LambdaCase
+  - EmptyCase
+  - MultiWayIf
+  - BlockArguments
+  - ImportQualifiedPost
+
+  - TypeOperators
+  - LiberalTypeSynonyms
+  - ExistentialQuantification
+  - GADTs
+  - TypeFamilyDependencies
+  - DataKinds
+  - PolyKinds
+  - StandaloneKindSignatures
+  - TypeApplications
+  - RankNTypes
+  - RoleAnnotations
+
+  - EmptyDataDeriving
+  - StandaloneDeriving
+  - DeriveTraversable
+  - DeriveGeneric
+  - GeneralisedNewtypeDeriving
+  - DeriveAnyClass
+  - DerivingVia
+
+  - ViewPatterns
+  - PatternSynonyms
+  - NamedFieldPuns
+
+  - FlexibleContexts
+  - DefaultSignatures
+  - FunctionalDependencies
+  - FlexibleInstances
+  - InstanceSigs
+
+  - NegativeLiterals
+  - BinaryLiterals
+  - HexFloatLiterals
+  - NumDecimals
+  - NumericUnderscores
+  - OverloadedStrings
+  - OverloadedLabels
+
+  - ConstraintKinds
+  - QuantifiedConstraints
+
+  - AllowAmbiguousTypes
+  - ScopedTypeVariables
+  - PartialTypeSignatures
+  - NamedWildCards
+
+  - BangPatterns
+  - StrictData
+
+dependencies:
+  - base
+  - deepseq
+  - hashable
+
+  - bytestring
+  - text
+  - text-short
+  - containers
+  - unordered-containers
+  - vector
+
+  - with-utf8
+  - optparse-applicative
+
+  - prettyprinter
+  - megaparsec
+
+  - mtl
+
+_exe-options: &exe-options
+  main: Main.hs
+  ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+  dependencies:
+    - unnamed
+
+library:
+  source-dirs: src
+  when:
+    - condition: false
+      other-modules: Paths_unnamed
+
+executables:
+  unnamed:
+    source-dirs: app
+    <<: *exe-options
+
+tests:
+  test-unnamed:
+    source-dirs: test
+    <<: *exe-options
+    when:
+      condition: true
+      dependencies:
+        - hspec
+        - hspec-discover
+        - hspec-hedgehog
+        - hedgehog
+
+flags:
+  release:
+    manual: true
+    default: false
+
+when:
+  - condition: flag(release)
+    ghc-options:
+      - -O2
+  - condition: "!flag(release)"
+    dependencies:
+      - pretty-simple

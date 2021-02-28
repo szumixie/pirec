@@ -1,0 +1,8 @@
+cradle:
+  stack:
+    - path: ./src
+      component: unnamed:lib
+    - path: ./app
+      component: unnamed:exe:unnamed
+    - path: ./test
+      component: unnamed:test:test-unnamed
