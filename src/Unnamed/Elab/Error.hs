@@ -4,10 +4,12 @@ module Unnamed.Elab.Error (
   prettyElabError,
 ) where
 
+import Data.Foldable (toList)
 import Data.Text.Prettyprint.Doc
 import Optics (declareFieldLabels)
 import Text.Megaparsec (SourcePos, sourcePosPretty)
 
+import Data.HashSet (HashSet)
 import Unnamed.Elab.Context (Context)
 import Unnamed.Value (Value)
 import Unnamed.Value.Pretty (prettyValue)
@@ -27,6 +29,9 @@ declareFieldLabels
       | ScopeError {name :: {-# UNPACK #-} Name}
       | LamInference
       | PiExpected {typ :: Value}
+      | DupField {field :: {-# UNPACK #-} Name}
+      | EmptyRowInference
+      | FieldMismatch {termset :: HashSet Name, typeset :: HashSet Name}
       deriving stock (Show)
     |]
 
@@ -44,3 +49,12 @@ prettyElabError (ElabError pos ctx err) =
     LamInference -> "cannot infer type of lambda"
     PiExpected a ->
       "expected function type but got inferred type:" <+> prettyValue ctx a
+    DupField x -> "duplicate field" <+> pretty x <+> "in row"
+    EmptyRowInference -> "cannot infer type of empty row"
+    FieldMismatch tset aset ->
+      vsep
+        [ "expected record with fields:"
+        , pretty $ toList aset
+        , "but got record with fields:"
+        , pretty $ toList tset
+        ]

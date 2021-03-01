@@ -2,6 +2,8 @@ module Unnamed.Syntax.Core (Term (..)) where
 
 import Optics (declareFieldLabels)
 
+import Data.HashMap.Strict (HashMap)
+
 import Unnamed.Var.Level (Level)
 import Unnamed.Var.Name (Name)
 
@@ -29,5 +31,9 @@ declareFieldLabels
           { fun :: Term
           , arg :: Term
           }
+      | Row {typ :: Term}
+      | RowCon {elems :: HashMap Name Term}
+      | Record {row :: Term}
+      | RecordCon {elems :: HashMap Name Term}
       deriving stock (Show)
     |]

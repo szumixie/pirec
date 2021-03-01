@@ -70,6 +70,14 @@ prettyTermWith ctx@(Context env names) = go
         backslash <> pretty x <> dot
           <+> prettyTermWith (ctx & extendCtx x) 0 t
     App t u -> parensIf (prec > 10) $ go 10 t <+> go 11 u
+    Row a -> parensIf (prec > 10) $ "Row" <+> go 11 a
+    RowCon ts ->
+      encloseSep "{ " " }" ", " $
+        itoList ts <&> \(x, t) -> pretty x <+> colon <+> go 0 t
+    Record r -> parensIf (prec > 10) $ "Record" <+> go 11 r
+    RecordCon ts ->
+      encloseSep "{ " " }" ", " $
+        itoList ts <&> \(x, t) -> pretty x <+> colon <+> go 0 t
 
 freshName :: HashSet Name -> Name -> Name
 freshName names name@(Name ts)

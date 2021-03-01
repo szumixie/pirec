@@ -31,5 +31,9 @@ declareFieldLabels
           { fun :: {-# UNPACK #-} Term
           , arg :: {-# UNPACK #-} Term
           }
+      | Row {typ :: {-# UNPACK #-} Term}
+      | RowCon {elems :: [(Name, Term)]}
+      | Record {row :: {-# UNPACK #-} Term}
+      | RecordCon {elems :: [(Name, Term)]}
       deriving stock (Show)
     |]

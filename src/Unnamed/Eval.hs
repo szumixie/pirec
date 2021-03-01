@@ -29,6 +29,10 @@ eval !env = go
       V.Neut t' -> V.app t' (go u)
       V.Lam _ t' -> appClosure t' (go u)
       _ -> error "bug"
+    Row a -> V.Row $ go a
+    RowCon ts -> V.RowCon $ go <$> ts
+    Record r -> V.Record $ go r
+    RecordCon ts -> V.RecordCon $ go <$> ts
 
 quote :: Level -> Value -> Term
 quote !lvl = go
@@ -38,6 +42,10 @@ quote !lvl = go
     V.U -> U
     V.Pi x a b -> Pi x (go a) $ quote (lvl + 1) (openClosure lvl b)
     V.Lam x t -> Lam x $ quote (lvl + 1) (openClosure lvl t)
+    V.Row a -> Row $ go a
+    V.RowCon ts -> RowCon $ go <$> ts
+    V.Record r -> Record $ go r
+    V.RecordCon ts -> RecordCon $ go <$> ts
 
   goNeut = \case
     V.Var x -> Var x

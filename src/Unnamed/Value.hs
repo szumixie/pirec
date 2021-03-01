@@ -6,6 +6,8 @@ module Unnamed.Value (
   app,
 ) where
 
+import Data.HashMap.Strict (HashMap)
+
 import Optics (declareFieldLabels)
 
 import Unnamed.Env (Env)
@@ -30,6 +32,10 @@ declareFieldLabels
           { name :: {-# UNPACK #-} Name
           , body :: {-# UNPACK #-} Closure
           }
+      | Row {typ :: Value}
+      | RowCon {elems :: HashMap Name Value}
+      | Record {row :: Value}
+      | RecordCon {elems :: HashMap Name Value}
       deriving stock (Show)
 
     data Neutral
