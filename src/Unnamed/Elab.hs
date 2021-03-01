@@ -1,6 +1,8 @@
 module Unnamed.Elab (check, infer) where
 
-import Unnamed.Elab.Context (Context)
+import Optics
+
+import Unnamed.Elab.Context (Context (..))
 import Unnamed.Elab.Context qualified as Ctx
 import Unnamed.Elab.Error
 import Unnamed.Eval
@@ -42,46 +44,43 @@ infer = snd . checkInfer
 
 checkInfer ::
   Context -> (R.Term -> Value -> ElabM Term, R.Term -> ElabM (Term, Value))
-checkInfer !ctx = (goInfer, goCheck)
+checkInfer ctx@(Context lvl env names) = (goInfer, goCheck)
  where
   goInfer = withPos \pos -> curry \case
     (R.Let x a t u, b) -> do
       a' <- goInfer a V.U
-      let va = eval (Ctx.env ctx) a'
+      let va = eval env a'
       t' <- goInfer t va
-      let vt = eval (Ctx.env ctx) t'
-      u' <- check (Ctx.extend x va vt ctx) u b
+      u' <- check (ctx & Ctx.extend x va (eval env t')) u b
       pure $ Let x a' t' u'
     (R.Lam x t, V.Pi _ a b) ->
-      Lam x <$> check (Ctx.bind x a ctx) t (openClosure (Ctx.level ctx) b)
+      Lam x <$> check (Ctx.bind x a ctx) t (openClosure lvl b)
     (t, a) -> do
       (t', a') <- goCheck $ WithPos pos t
-      if conv (Ctx.level ctx) a a'
+      if conv lvl a a'
         then pure t'
         else Left $ ElabError pos ctx (ConvError a a')
 
   goCheck = withPos \pos -> \case
-    R.Var x -> case Ctx.getType x ctx of
+    R.Var x -> case names ^. at x of
       Nothing -> Left $ ElabError pos ctx (ScopeError x)
       Just (l, t) -> Right (Var l, t)
     R.Let x a t u -> do
       a' <- goInfer a V.U
-      let va = eval (Ctx.env ctx) a'
+      let va = eval env a'
       t' <- goInfer t va
-      let vt = eval (Ctx.env ctx) t'
-      (u', b) <- infer (Ctx.extend x va vt ctx) u
+      (u', b) <- infer (ctx & Ctx.extend x va (eval env t')) u
       pure (Let x a' t' u', b)
     R.U -> pure (U, V.U)
     R.Pi x a b -> do
       a' <- goInfer a V.U
-      let va = eval (Ctx.env ctx) a'
-      b' <- check (Ctx.bind x va ctx) b V.U
+      b' <- check (ctx & Ctx.bind x (eval env a')) b V.U
       pure (Pi x a' b', V.U)
     R.Lam{} -> Left $ ElabError pos ctx LamInference
     R.App t u -> do
-      (t', c) <- goCheck t
-      case c of
+      (t', p) <- goCheck t
+      case p of
         V.Pi _ a b -> do
           u' <- goInfer u a
-          pure (App t' u', appClosure b (eval (Ctx.env ctx) u'))
-        _ -> Left $ ElabError pos ctx (PiExpected c)
+          pure (App t' u', appClosure b (eval env u'))
+        _ -> Left $ ElabError pos ctx (PiExpected p)

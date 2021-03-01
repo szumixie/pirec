@@ -11,7 +11,7 @@ import Unnamed.Value qualified as V
 import Unnamed.Var.Level (Level)
 
 appClosure :: Closure -> Value -> Value
-appClosure (V.Closure env t) u = eval (Env.extend u env) t
+appClosure (V.Closure env t) u = eval (env & Env.extend u) t
 
 openClosure :: Level -> Closure -> Value
 openClosure lvl t = appClosure t (V.var lvl)
@@ -20,13 +20,13 @@ eval :: Env Value -> Term -> Value
 eval !env = go
  where
   go = \case
-    Var x -> Env.index x env & fromMaybe (error "bug")
-    Let _ _ t u -> eval (Env.extend (go t) env) u
+    Var x -> env & Env.index x & fromMaybe (error "bug")
+    Let _ _ t u -> eval (env & Env.extend (go t)) u
     U -> V.U
     Pi x a b -> V.Pi x (go a) $ V.Closure env b
     Lam x t -> V.Lam x $ V.Closure env t
     App t u -> case go t of
-      V.Neut t' -> V.Neut $ V.App t' (go u)
+      V.Neut t' -> V.app t' (go u)
       V.Lam _ t' -> appClosure t' (go u)
       _ -> error "bug"
 

@@ -6,25 +6,37 @@ module Unnamed.Value (
   app,
 ) where
 
+import Optics (declareFieldLabels)
+
 import Unnamed.Env (Env)
 import Unnamed.Syntax.Core (Term)
 import Unnamed.Var.Level (Level (..))
 import Unnamed.Var.Name (Name)
 
-data Closure = Closure (Env Value) Term
-  deriving stock (Show)
+declareFieldLabels
+  [d|
+    data Closure = Closure {env :: Env Value, body :: Term}
+      deriving stock (Show)
 
-data Value
-  = Neut Neutral
-  | U
-  | Pi {-# UNPACK #-} Name ~Value {-# UNPACK #-} Closure
-  | Lam {-# UNPACK #-} Name {-# UNPACK #-} Closure
-  deriving stock (Show)
+    data Value
+      = Neut {neut :: Neutral}
+      | U
+      | Pi
+          { name :: {-# UNPACK #-} Name
+          , source :: ~Value
+          , target :: {-# UNPACK #-} Closure
+          }
+      | Lam
+          { name :: {-# UNPACK #-} Name
+          , body :: {-# UNPACK #-} Closure
+          }
+      deriving stock (Show)
 
-data Neutral
-  = Var {-# UNPACK #-} Level
-  | App Neutral ~Value
-  deriving stock (Show)
+    data Neutral
+      = Var {level :: {-# UNPACK #-} Level}
+      | App {fun :: Neutral, arg :: ~Value}
+      deriving stock (Show)
+    |]
 
 var :: Level -> Value
 var = Neut . Var

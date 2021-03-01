@@ -1,6 +1,8 @@
 module Unnamed.Syntax.Raw.Parse (Parser, parser) where
 
+import Control.Monad (join)
 import Data.Char (isLetter)
+import Data.Function ((&))
 import Data.Functor ((<&>))
 import Data.List (foldl1')
 import Data.List.NonEmpty qualified as NE
@@ -55,10 +57,10 @@ ident :: Parser Text
 ident = lexeme $ try do
   offset <- getOffset
   text <- takeWhile1P (Just "identifier") isLetter
-  if Set.member text keywords
+  if text `Set.member` keywords
     then
       region (setErrorOffset offset) . label "identifier" $
-        unexpected (Tokens . NE.fromList . Text.unpack $ text)
+        unexpected (Tokens $ text & Text.unpack & NE.fromList)
     else pure text
 
 parser :: Parser R.Term
@@ -95,7 +97,7 @@ termU :: Parser R.Term'
 termU = R.U <$ univ
 
 termPi :: Parser (R.Term -> R.Term)
-termPi = foldr (.) id . mconcat <$> some (parens binder) <* arrow
+termPi = foldr (.) id . join <$> some (parens binder) <* arrow
  where
   binder = do
     f <- some do

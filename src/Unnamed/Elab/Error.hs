@@ -5,6 +5,7 @@ module Unnamed.Elab.Error (
 ) where
 
 import Data.Text.Prettyprint.Doc
+import Optics (declareFieldLabels)
 import Text.Megaparsec (SourcePos, sourcePosPretty)
 
 import Unnamed.Elab.Context (Context)
@@ -12,19 +13,22 @@ import Unnamed.Value (Value)
 import Unnamed.Value.Pretty (prettyValue)
 import Unnamed.Var.Name (Name)
 
-data ElabError
-  = ElabError
-      {-# UNPACK #-} SourcePos
-      {-# UNPACK #-} Context
-      ElabErrorType
-  deriving stock (Show)
+declareFieldLabels
+  [d|
+    data ElabError = ElabError
+      { pos :: {-# UNPACK #-} SourcePos
+      , ctx :: {-# UNPACK #-} Context
+      , err :: ElabErrorType
+      }
+      deriving stock (Show)
 
-data ElabErrorType
-  = ConvError Value Value
-  | ScopeError {-# UNPACK #-} Name
-  | LamInference
-  | PiExpected Value
-  deriving stock (Show)
+    data ElabErrorType
+      = ConvError {expected :: Value, inferred :: Value}
+      | ScopeError {name :: {-# UNPACK #-} Name}
+      | LamInference
+      | PiExpected {typ :: Value}
+      deriving stock (Show)
+    |]
 
 prettyElabError :: ElabError -> Doc ann
 prettyElabError (ElabError pos ctx err) =

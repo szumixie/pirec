@@ -38,6 +38,9 @@ default-extensions:
   - RankNTypes
   - RoleAnnotations
 
+  - DuplicateRecordFields
+  - NamedFieldPuns
+
   - EmptyDataDeriving
   - StandaloneDeriving
   - DeriveTraversable
@@ -48,12 +51,12 @@ default-extensions:
 
   - ViewPatterns
   - PatternSynonyms
-  - NamedFieldPuns
 
   - FlexibleContexts
   - DefaultSignatures
   - FunctionalDependencies
   - FlexibleInstances
+  - UndecidableInstances
   - InstanceSigs
 
   - NegativeLiterals
@@ -72,6 +75,8 @@ default-extensions:
   - PartialTypeSignatures
   - NamedWildCards
 
+  - TemplateHaskell
+
   - BangPatterns
   - StrictData
 
@@ -87,13 +92,15 @@ dependencies:
   - unordered-containers
   - vector
 
+  - optics
+
+  - mtl
+
   - with-utf8
   - optparse-applicative
 
   - prettyprinter
   - megaparsec
-
-  - mtl
 
 _exe-options: &exe-options
   main: Main.hs
