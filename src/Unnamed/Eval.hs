@@ -1,7 +1,8 @@
 module Unnamed.Eval (appClosure, openClosure, eval, quote, normal) where
 
-import Data.Function ((&))
 import Data.Maybe (fromMaybe)
+
+import Optics
 
 import Unnamed.Env (Env)
 import Unnamed.Env qualified as Env
@@ -33,6 +34,10 @@ eval !env = go
     RowCon ts -> V.RowCon $ go <$> ts
     Record r -> V.Record $ go r
     RecordCon ts -> V.RecordCon $ go <$> ts
+    RecordProj f t -> case go t of
+      V.Neut t' -> V.Neut $ V.RecordProj f t'
+      V.RecordCon ts -> ts ^. at f & fromMaybe (error "bug")
+      _ -> error "bug"
 
 quote :: Level -> Value -> Term
 quote !lvl = go
@@ -50,6 +55,7 @@ quote !lvl = go
   goNeut = \case
     V.Var x -> Var x
     V.App t u -> App (goNeut t) (go u)
+    V.RecordProj f t -> RecordProj f (goNeut t)
 
 normal :: Term -> Term
 normal = quote 0 . eval Env.empty

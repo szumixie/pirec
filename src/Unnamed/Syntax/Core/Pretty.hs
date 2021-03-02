@@ -78,6 +78,7 @@ prettyTermWith ctx@(Context env names) = go
     RecordCon ts ->
       encloseSep "{ " " }" ", " $
         itoList ts <&> \(x, t) -> pretty x <+> colon <+> go 0 t
+    RecordProj f t -> go 21 t <> dot <> pretty f
 
 freshName :: HashSet Name -> Name -> Name
 freshName names name@(Name ts)

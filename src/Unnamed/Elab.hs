@@ -42,6 +42,7 @@ conv !lvl = go
   goNeut = curry \case
     (V.Var x, V.Var x') -> x == x'
     (V.App t u, V.App t' u') -> goNeut t t' && go u u'
+    (V.RecordProj f t, V.RecordProj f' t') -> f == f' && goNeut t t'
     _ -> False
 
 type ElabM = Either ElabError
@@ -123,6 +124,12 @@ checkInfer ctx@(Context lvl env names) = (goCheck, goInfer)
       ts' <- labelsUnique pos ts
       tsc <- traverse goInfer ts'
       pure (RecordCon $ fst <$> tsc, V.RowCon $ snd <$> tsc)
+    R.RecordProj f t -> do
+      (t', r) <- goInfer t
+      case r of
+        V.Record (V.RowCon as)
+          | Just a <- as ^. at f -> pure (RecordProj f t', a)
+        _ -> Left $ ElabError pos ctx (FieldExpected f r)
 
   labelsUnique pos = foldM go Map.empty
    where

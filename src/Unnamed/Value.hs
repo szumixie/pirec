@@ -41,6 +41,7 @@ declareFieldLabels
     data Neutral
       = Var {level :: {-# UNPACK #-} Level}
       | App {fun :: Neutral, arg :: ~Value}
+      | RecordProj {field :: {-# UNPACK #-} Name, record :: Neutral}
       deriving stock (Show)
     |]
 

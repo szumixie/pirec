@@ -35,5 +35,6 @@ declareFieldLabels
       | RowCon {elems :: HashMap Name Term}
       | Record {row :: Term}
       | RecordCon {elems :: HashMap Name Term}
+      | RecordProj {field :: {-# UNPACK #-} Name, record :: Term}
       deriving stock (Show)
     |]

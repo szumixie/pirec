@@ -35,5 +35,9 @@ declareFieldLabels
       | RowCon {elems :: [(Name, Term)]}
       | Record {row :: {-# UNPACK #-} Term}
       | RecordCon {elems :: [(Name, Term)]}
+      | RecordProj
+          { field :: {-# UNPACK #-} Name
+          , record :: {-# UNPACK #-} Term
+          }
       deriving stock (Show)
     |]

@@ -32,6 +32,7 @@ declareFieldLabels
       | DupField {field :: {-# UNPACK #-} Name}
       | EmptyRowInference
       | FieldMismatch {termset :: HashSet Name, typeset :: HashSet Name}
+      | FieldExpected {field :: {-# UNPACK #-} Name, typ :: Value}
       deriving stock (Show)
     |]
 
@@ -58,3 +59,5 @@ prettyElabError (ElabError pos ctx err) =
         , "but got record with fields:"
         , pretty $ toList tset
         ]
+    FieldExpected f a ->
+      "expected field" <+> pretty f <+> "in type:" <> line <> prettyValue ctx a

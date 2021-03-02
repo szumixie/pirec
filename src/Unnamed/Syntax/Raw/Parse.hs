@@ -2,6 +2,7 @@ module Unnamed.Syntax.Raw.Parse (Parser, parser) where
 
 import Control.Monad (join)
 import Data.Char (isLetter)
+import Data.Foldable (foldl')
 import Data.Function ((&))
 import Data.Functor ((<&>))
 import Data.List (foldl1')
@@ -90,6 +91,9 @@ termPrec prec
       [ WithPos pos <$> choice [termRow, termRecord]
       , some (termPrec 11) <&> foldl1' \t u -> WithPos pos $ R.App t u
       ]
+  | prec <= 20 = do
+    t <- termPrec 21
+    foldl' (flip ($)) t <$> many termRecordProj
   | otherwise =
     parens term
       <|> termWithPos (choice [termVar, termU, try termRowCon, termRecordCon])
@@ -142,3 +146,9 @@ termRecord = R.Record <$ record <*> termPrec 11
 termRecordCon :: Parser R.Term'
 termRecordCon =
   braces $ R.RecordCon <$> ((,) <$> ident <* equals <*> term) `sepBy1` comma
+
+termRecordProj :: Parser (R.Term -> R.Term)
+termRecordProj = do
+  pos <- getSourcePos
+  f <- dot *> ident
+  pure $ WithPos pos . R.RecordProj f
