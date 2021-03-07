@@ -134,6 +134,15 @@ tests:
         - hspec-hedgehog
         - hedgehog
 
+benchmarks:
+  bench-unnamed:
+    source-dirs: benchmark
+    <<: *exe-options
+    when:
+      condition: true
+      dependencies:
+        - criterion
+
 flags:
   release:
     manual: true
