@@ -37,6 +37,10 @@ conv !lvl = go
     (V.Record r, V.Record r') -> go r r'
     (V.RecordCon ts, V.RecordCon ts') ->
       Map.keysSet ts == Map.keysSet ts' && and (Map.intersectionWith go ts ts')
+    (V.RecordCon ts, V.Neut t') ->
+      ts & iallOf ifolded \x t -> go t (V.Neut $ V.RecordProj x t')
+    (V.Neut t, V.RecordCon ts') ->
+      ts' & iallOf ifolded \x t' -> go t' (V.Neut $ V.RecordProj x t)
     _ -> False
 
   goNeut = curry \case
