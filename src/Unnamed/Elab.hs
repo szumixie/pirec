@@ -1,5 +1,7 @@
 module Unnamed.Elab (check, infer) where
 
+import Relude
+
 import Optics
 
 import Unnamed.Elab.Context (Context (..))

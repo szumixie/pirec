@@ -1,5 +1,7 @@
 module Unnamed.Syntax.Core (Term (..)) where
 
+import Relude
+
 import Optics (declareFieldLabels)
 
 import Unnamed.Var.Level (Level)

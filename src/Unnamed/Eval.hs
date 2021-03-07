@@ -1,7 +1,6 @@
 module Unnamed.Eval (appClosure, openClosure, eval, quote, normal) where
 
-import Data.Function ((&))
-import Data.Maybe (fromMaybe)
+import Relude
 
 import Unnamed.Env (Env)
 import Unnamed.Env qualified as Env
@@ -20,7 +19,7 @@ eval :: Env Value -> Term -> Value
 eval !env = go
  where
   go = \case
-    Var x -> env & Env.index x & fromMaybe (error "bug")
+    Var x -> env & Env.index x ?: error "bug"
     Let _ _ t u -> eval (env & Env.extend (go t)) u
     U -> V.U
     Pi x a b -> V.Pi x (go a) $ V.Closure env b

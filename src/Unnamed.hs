@@ -1,9 +1,10 @@
 module Unnamed (main) where
 
-import Data.Text.IO.Utf8 qualified as Text
+import Relude
+
+import Data.Text.IO.Utf8 qualified as Utf8
 import Main.Utf8 (withUtf8)
-import System.Exit (exitFailure)
-import System.IO (hPutStr, stderr)
+import System.IO (hPutStr)
 
 import Options.Applicative
 import Prettyprinter ((<+>))
@@ -28,7 +29,7 @@ opts = Options <$> strArgument (metavar "PATH")
 main :: IO ()
 main = withUtf8 do
   Options{optionsFilePath = fp} <- execParser $ info (opts <**> helper) mempty
-  content <- Text.readFile fp
+  content <- Utf8.readFile fp
   raw <- case MP.parse R.parser fp content of
     Right raw -> pure raw
     Left err -> hPutStr stderr (MP.errorBundlePretty err) *> exitFailure

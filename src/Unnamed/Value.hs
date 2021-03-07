@@ -6,6 +6,8 @@ module Unnamed.Value (
   app,
 ) where
 
+import Relude
+
 import Optics (declareFieldLabels)
 
 import Unnamed.Env (Env)

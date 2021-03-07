@@ -4,6 +4,8 @@ module Unnamed.Elab.Error (
   prettyElabError,
 ) where
 
+import Relude
+
 import Data.Text.Prettyprint.Doc
 import Optics (declareFieldLabels)
 import Text.Megaparsec (SourcePos, sourcePosPretty)

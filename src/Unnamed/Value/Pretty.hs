@@ -1,6 +1,6 @@
 module Unnamed.Value.Pretty (prettyValue) where
 
-import GHC.Exts (sortWith)
+import Relude
 
 import Data.Text.Prettyprint.Doc (Doc)
 import Optics

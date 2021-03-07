@@ -19,6 +19,7 @@ ghc-options:
 
 default-extensions:
   - RecursiveDo
+  - NoImplicitPrelude
   - TupleSections
   - LambdaCase
   - EmptyCase
@@ -82,8 +83,7 @@ default-extensions:
 
 dependencies:
   - base
-  - deepseq
-  - hashable
+  - relude
 
   - bytestring
   - text

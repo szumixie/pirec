@@ -1,17 +1,11 @@
 module Unnamed.Syntax.Raw.Parse (Parser, parser) where
 
-import Control.Monad (join)
+import Relude hiding (many, some)
+
 import Data.Char (isLetter)
-import Data.Function ((&))
-import Data.Functor ((<&>))
+import Data.HashSet qualified as Set
 import Data.List (foldl1')
 import Data.List.NonEmpty qualified as NE
-import Data.Void (Void)
-
-import Data.HashSet (HashSet)
-import Data.HashSet qualified as Set
-import Data.Text (Text)
-import Data.Text qualified as Text
 
 import Text.Megaparsec
 import Text.Megaparsec.Char (letterChar, space1)
@@ -60,7 +54,7 @@ ident = lexeme $ try do
   if text `Set.member` keywords
     then
       region (setErrorOffset offset) . label "identifier" $
-        unexpected (Tokens $ text & Text.unpack & NE.fromList)
+        unexpected (Tokens $ text & toString & NE.fromList)
     else pure text
 
 parser :: Parser R.Term

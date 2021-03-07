@@ -6,11 +6,9 @@ module Unnamed.Syntax.Core.Pretty (
   prettyTermWith,
 ) where
 
-import Data.Char (isDigit)
-import Data.Either (fromRight)
-import Data.Maybe (fromMaybe)
+import Relude
 
-import Data.HashSet (HashSet)
+import Data.Char (isDigit)
 import Data.HashSet qualified as Set
 import Data.Text.Read qualified as Text
 import Data.Text.Short qualified as TS

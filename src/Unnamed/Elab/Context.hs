@@ -1,6 +1,7 @@
 module Unnamed.Elab.Context (Context (..), empty, extend, bind) where
 
-import Data.HashMap.Strict (HashMap)
+import Relude hiding (empty)
+
 import Data.HashMap.Strict qualified as Map
 
 import Optics

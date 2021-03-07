@@ -1,6 +1,7 @@
 module Unnamed.Env (Env, empty, extend, index) where
 
-import Data.Sequence (Seq)
+import Relude hiding (empty)
+
 import Data.Sequence qualified as Seq
 
 import Unnamed.Var.Level (Level (..))
