@@ -36,7 +36,8 @@ keywords = Set.fromList ["let", "in", "U"]
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
 
-let_, equals, semicolon, in_, univ, arrow, colon, lambda, dot :: Parser Text
+uscore, let_, equals, semicolon, in_, univ, arrow, colon, lambda, dot :: Parser Text
+uscore = symbol "_"
 let_ = keyword "let"
 equals = symbol "="
 semicolon = symbol ";"
@@ -74,10 +75,14 @@ termPrec prec
     pos <- getSourcePos
     some (termPrec 11) <&> foldl1' \t u -> WithPos pos $ R.App t u
   | otherwise =
-    parens term <|> WithPos <$> getSourcePos <*> choice [termVar, termU]
+    parens term
+      <|> WithPos <$> getSourcePos <*> choice [termVar, termHole, termU]
 
 termVar :: Parser R.Term'
 termVar = R.Var . name <$> ident
+
+termHole :: Parser R.Term'
+termHole = R.Hole <$ uscore
 
 termLet :: Parser (R.Term -> R.Term)
 termLet = foldr (.) id <$ let_ <*> def `sepEndBy1` semicolon <* in_

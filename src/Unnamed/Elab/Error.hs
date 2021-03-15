@@ -6,43 +6,48 @@ module Unnamed.Elab.Error (
 
 import Relude
 
+import Control.Effect
 import Data.Text.Prettyprint.Doc
 import Optics (declareFieldLabels)
 import Text.Megaparsec (SourcePos, sourcePosPretty)
 
-import Unnamed.Elab.Context (Context)
 import Unnamed.Value (Value)
-import Unnamed.Value.Pretty (prettyValue)
 import Unnamed.Var.Name (Name)
+
+import Unnamed.Effect.Meta
+import Unnamed.Elab.Context (Context)
+import Unnamed.Unify.Error (UnifyError, prettyUnifyError)
+import Unnamed.Value.Pretty (prettyValue)
 
 declareFieldLabels
   [d|
     data ElabError = ElabError
       { pos :: {-# UNPACK #-} SourcePos
-      , ctx :: {-# UNPACK #-} Context
-      , err :: ElabErrorType
+      , context :: {-# UNPACK #-} Context
+      , error :: ElabErrorType
       }
       deriving stock (Show)
 
     data ElabErrorType
-      = ConvError {expected :: Value, inferred :: Value}
+      = UnifyError {expected :: Value, inferred :: Value, error :: UnifyError}
       | ScopeError {name :: {-# UNPACK #-} Name}
-      | LamInference
-      | PiExpected {typ :: Value}
       deriving stock (Show)
     |]
 
-prettyElabError :: ElabError -> Doc ann
-prettyElabError (ElabError pos ctx err) =
-  pretty (sourcePosPretty pos) <> colon <> line <> case err of
-    ConvError a a' ->
-      vsep
-        [ "expected type:"
-        , prettyValue ctx a
-        , "but got inferred type:"
-        , prettyValue ctx a'
-        ]
-    ScopeError x -> "variable" <+> pretty x <+> "out of scope"
-    LamInference -> "cannot infer type of lambda"
-    PiExpected a ->
-      "expected function type but got inferred type:" <+> prettyValue ctx a
+prettyElabError :: Eff MetaLookup m => ElabError -> m (Doc ann)
+prettyElabError (ElabError pos ctx err) = do
+  perr <- case err of
+    UnifyError va va' uerr -> do
+      puerr <- prettyUnifyError ctx uerr
+      pa <- prettyValue ctx va
+      pa' <- prettyValue ctx va'
+      pure $
+        vsep
+          [ puerr
+          , "when unifying expected type:"
+          , pa
+          , "with inferred type:"
+          , pa'
+          ]
+    ScopeError x -> pure $ "variable" <+> pretty x <+> "out of scope"
+  pure $ pretty (sourcePosPretty pos) <> colon <> line <> perr

@@ -9,13 +9,13 @@ module Unnamed.Syntax.Core.Pretty (
 import Relude
 
 import Data.Char (isDigit)
-import Data.HashSet qualified as Set
 import Data.Text.Read qualified as Text
 import Data.Text.Short qualified as TS
 
 import Optics
 import Prettyprinter
 
+import Unnamed.BoundMask qualified as BM
 import Unnamed.Env (Env)
 import Unnamed.Env qualified as Env
 import Unnamed.Syntax.Core (Term (..))
@@ -28,11 +28,11 @@ declareFieldLabels
     |]
 
 emptyCtx :: Context
-emptyCtx = Context Env.empty Set.empty
+emptyCtx = Context Env.empty mempty
 
 extendCtx :: Name -> Context -> Context
 extendCtx name (Context env names) =
-  Context (env & Env.extend name) (names & Set.insert name)
+  Context (env & Env.extend name) (names & contains name .~ True)
 
 prettyTerm :: Term -> Doc ann
 prettyTerm = prettyTermWith emptyCtx 0
@@ -41,7 +41,11 @@ prettyTermWith :: Context -> Int -> Term -> Doc ann
 prettyTermWith ctx@(Context env names) = go
  where
   go !prec = \case
-    Var x -> env & Env.index x & fromMaybe (error "bug") & pretty
+    Var lx -> env & Env.index lx & fromMaybe (error "bug") & pretty
+    Meta mx Nothing -> pretty mx
+    Meta mx (Just mask) ->
+      parensIf (prec > 10) $
+        env & foldlOf' (BM.masked mask % to pretty) (<+>) (pretty mx)
     Let (freshName names -> x) a t u ->
       parensIf (prec > 0) $
         hsep
@@ -71,7 +75,7 @@ prettyTermWith ctx@(Context env names) = go
 
 freshName :: HashSet Name -> Name -> Name
 freshName names name@(Name ts)
-  | name == "_" || not (name `Set.member` names) = name
+  | name == "_" || not (names ^. contains name) = name
   | otherwise = go newIndex
  where
   (prefix, suffix) = TS.spanEnd isDigit ts
@@ -80,7 +84,7 @@ freshName names name@(Name ts)
     | otherwise =
       suffix & TS.toText & Text.decimal @Int & fromRight (error "bug") & fst
   go !i
-    | not $ newName `Set.member` names = newName
+    | not $ names ^. contains newName = newName
     | otherwise = go $ i + 1
    where
     newName = Name $ prefix <> TS.fromString (show i)

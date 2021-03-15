@@ -13,6 +13,7 @@ declareFieldLabels
 
     data Term'
       = Var {name :: {-# UNPACK #-} Name}
+      | Hole
       | Let
           { name :: {-# UNPACK #-} Name
           , typ :: {-# UNPACK #-} Term

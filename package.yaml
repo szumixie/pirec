@@ -16,6 +16,8 @@ ghc-options:
   - -Wredundant-constraints
   - -Wpartial-fields
   - -Wmissing-deriving-strategies
+  
+  - -fplugin=Control.Effect.Plugin
 
 default-extensions:
   - RecursiveDo
@@ -91,10 +93,14 @@ dependencies:
   - containers
   - unordered-containers
   - vector
+  - mutable-containers
+  - hashtables
 
   - optics
 
   - mtl
+  - in-other-words
+  - in-other-words-plugin
 
   - with-utf8
   - optparse-applicative

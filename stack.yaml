@@ -7,3 +7,6 @@ extra-deps:
   - optics-extra-0.4
   - optics-th-0.4
   - indexed-traversable-instances-0.1
+
+  - in-other-words-0.2.0.0
+  - in-other-words-plugin-0.1.0.0
