@@ -32,9 +32,9 @@ declareFieldLabels
           { name :: {-# UNPACK #-} Name
           , body :: {-# UNPACK #-} Closure
           }
-      | Row {typ :: Value}
+      | RowType {typ :: Value}
       | RowCon {elems :: HashMap Name Value}
-      | Record {row :: Value}
+      | RecordType {row :: Value}
       | RecordCon {elems :: HashMap Name Value}
       deriving stock (Show)
 

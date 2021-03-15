@@ -31,10 +31,10 @@ conv !lvl = go
       conv (lvl + 1) (openClosure lvl t) (V.app t' (V.var lvl))
     (V.Neut t, V.Lam _ t') ->
       conv (lvl + 1) (V.app t (V.var lvl)) (openClosure lvl t')
-    (V.Row a, V.Row a') -> go a a'
+    (V.RowType a, V.RowType a') -> go a a'
     (V.RowCon ts, V.RowCon ts') ->
       Map.keysSet ts == Map.keysSet ts' && and (Map.intersectionWith go ts ts')
-    (V.Record r, V.Record r') -> go r r'
+    (V.RecordType r, V.RecordType r') -> go r r'
     (V.RecordCon ts, V.RecordCon ts') ->
       Map.keysSet ts == Map.keysSet ts' && and (Map.intersectionWith go ts ts')
     (V.RecordCon ts, V.Neut t') ->
@@ -70,10 +70,10 @@ checkInfer ctx@(Context lvl env names) = (goCheck, goInfer)
       pure $ Let x a' t' u'
     (R.Lam x t, V.Pi _ a b) ->
       Lam x <$> check (Ctx.bind x a ctx) t (openClosure lvl b)
-    (R.RowCon ts, V.Row a) -> do
+    (R.RowCon ts, V.RowType a) -> do
       ts' <- labelsUnique pos ts
       RowCon <$> traverse (`goCheck` a) ts'
-    (R.RecordCon ts, V.Record (V.RowCon as)) -> do
+    (R.RecordCon ts, V.RecordType (V.RowCon as)) -> do
       ts' <- labelsUnique pos ts
       let tset = Map.keysSet ts'
           aset = Map.keysSet as
@@ -112,18 +112,18 @@ checkInfer ctx@(Context lvl env names) = (goCheck, goInfer)
           u' <- goCheck u a
           pure (App t' u', appClosure b (eval env u'))
         _ -> Left $ ElabError pos ctx (PiExpected p)
-    R.Row a -> do
+    R.RowType a -> do
       a' <- goCheck a V.U
-      pure (Row a', V.U)
+      pure (RowType a', V.U)
     R.RowCon [] -> Left $ ElabError pos ctx EmptyRowInference
     R.RowCon ((x0, t0) : ts) -> do
       (t0', a) <- goInfer t0
       ts' <- labelsUnique pos ((x0, t0) : ts)
       tsc <- ifor ts' \x t -> if x == x0 then pure t0' else goCheck t a
-      pure (RowCon tsc, V.Row a)
-    R.Record r -> do
-      r' <- goCheck r $ V.Row V.U
-      pure (Record r', V.U)
+      pure (RowCon tsc, V.RowType a)
+    R.RecordType r -> do
+      r' <- goCheck r $ V.RowType V.U
+      pure (RecordType r', V.U)
     R.RecordCon ts -> do
       ts' <- labelsUnique pos ts
       tsc <- traverse goInfer ts'
@@ -131,7 +131,7 @@ checkInfer ctx@(Context lvl env names) = (goCheck, goInfer)
     R.RecordProj f t -> do
       (t', r) <- goInfer t
       case r of
-        V.Record (V.RowCon as)
+        V.RecordType (V.RowCon as)
           | Just a <- as ^. at f -> pure (RecordProj f t', a)
         _ -> Left $ ElabError pos ctx (FieldExpected f r)
 

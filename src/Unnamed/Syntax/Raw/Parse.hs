@@ -88,7 +88,7 @@ termPrec prec
   | prec <= 10 = do
     pos <- getSourcePos
     choice
-      [ WithPos pos <$> choice [termRow, termRecord]
+      [ WithPos pos <$> choice [termRowType, termRecordType]
       , some (termPrec 11) <&> foldl1' \t u -> WithPos pos $ R.App t u
       ]
   | prec <= 20 = do
@@ -134,14 +134,14 @@ termLam = foldr (.) id <$ lambda <*> some binder <* dot
     f <- R.Lam <$> ident
     pure $ WithPos pos . f
 
-termRow :: Parser R.Term'
-termRow = R.Row <$ row <*> termPrec 11
+termRowType :: Parser R.Term'
+termRowType = R.RowType <$ row <*> termPrec 11
 
 termRowCon :: Parser R.Term'
 termRowCon = braces $ R.RowCon <$> ((,) <$> ident <* colon <*> term) `sepBy1` comma
 
-termRecord :: Parser R.Term'
-termRecord = R.Record <$ record <*> termPrec 11
+termRecordType :: Parser R.Term'
+termRecordType = R.RecordType <$ record <*> termPrec 11
 
 termRecordCon :: Parser R.Term'
 termRecordCon =

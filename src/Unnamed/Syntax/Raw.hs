@@ -31,9 +31,9 @@ declareFieldLabels
           { fun :: {-# UNPACK #-} Term
           , arg :: {-# UNPACK #-} Term
           }
-      | Row {typ :: {-# UNPACK #-} Term}
+      | RowType {typ :: {-# UNPACK #-} Term}
       | RowCon {elems :: [(Name, Term)]}
-      | Record {row :: {-# UNPACK #-} Term}
+      | RecordType {row :: {-# UNPACK #-} Term}
       | RecordCon {elems :: [(Name, Term)]}
       | RecordProj
           { field :: {-# UNPACK #-} Name
