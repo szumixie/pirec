@@ -21,11 +21,8 @@ import Unnamed.Env qualified as Env
 import Unnamed.Syntax.Core (Term (..))
 import Unnamed.Var.Name (Name (..))
 
-declareFieldLabels
-  [d|
-    data Context = Context {env :: Env Name, names :: HashSet Name}
-      deriving stock (Show)
-    |]
+data Context = Context (Env Name) (HashSet Name)
+  deriving stock (Show)
 
 emptyCtx :: Context
 emptyCtx = Context Env.empty mempty

@@ -2,14 +2,10 @@ module Unnamed.Var.Meta (Meta (..)) where
 
 import Relude
 
-import Optics (declareFieldLabels)
-import Prettyprinter
+import Prettyprinter (Pretty, pretty)
 
-declareFieldLabels
-  [d|
-    newtype Meta = Meta {int :: Int}
-      deriving newtype (Show, Num, Eq, Hashable)
-    |]
+newtype Meta = Meta Int
+  deriving newtype (Show, Num, Eq, Hashable)
 
 instance Pretty Meta where
   pretty (Meta i) = "?" <> pretty i

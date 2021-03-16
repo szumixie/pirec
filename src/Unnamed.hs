@@ -23,7 +23,7 @@ import Unnamed.Syntax.Core.Pretty (prettyTerm)
 import Unnamed.Syntax.Raw.Parse qualified as R
 import Unnamed.Value.Pretty (prettyValue)
 
-newtype Options = Options {optionsFilePath :: FilePath}
+newtype Options = Options FilePath
   deriving stock (Show)
 
 opts :: Parser Options
@@ -31,7 +31,7 @@ opts = Options <$> strArgument (metavar "PATH")
 
 main :: IO ()
 main = withUtf8 do
-  Options{optionsFilePath = fp} <- execParser $ info (opts <**> helper) mempty
+  Options fp <- execParser $ info (opts <**> helper) mempty
   content <- Utf8.readFile fp
   raw <- case MP.parse R.parser fp content of
     Right raw -> pure raw

@@ -4,7 +4,6 @@ import Relude
 
 import Control.Effect
 import Data.Text.Prettyprint.Doc
-import Optics
 
 import Unnamed.Value (Value)
 import Unnamed.Value qualified as V
@@ -15,17 +14,14 @@ import Unnamed.Effect.Meta
 import Unnamed.Elab.Context (Context)
 import Unnamed.Value.Pretty (prettyValue)
 
-declareFieldLabels
-  [d|
-    data UnifyError
-      = Mismatch {expected :: Value, inferred :: Value}
-      | ScopeError {level :: Level}
-      | OccursError {meta :: Meta}
-      | Nonlinear {level :: Level}
-      | Nonvariable {value :: Value}
-      | ProjError
-      deriving stock (Show)
-    |]
+data UnifyError
+  = Mismatch Value Value
+  | ScopeError Level
+  | OccursError Meta
+  | Nonlinear Level
+  | Nonvariable Value
+  | ProjError
+  deriving stock (Show)
 
 prettyUnifyError :: Eff MetaLookup m => Context -> UnifyError -> m (Doc ann)
 prettyUnifyError ctx = \case

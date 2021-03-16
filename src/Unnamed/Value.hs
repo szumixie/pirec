@@ -9,48 +9,36 @@ module Unnamed.Value (
 
 import Relude
 
-import Optics (declareFieldLabels)
-
 import Unnamed.Env (Env)
 import Unnamed.Syntax.Core (Term)
 import Unnamed.Var.Level (Level (..))
 import Unnamed.Var.Meta (Meta)
 import Unnamed.Var.Name (Name)
 
-declareFieldLabels
-  [d|
-    data Closure = Closure {env :: Env Value, body :: Term}
-      deriving stock (Show)
+data Closure = Closure (Env Value) Term
+  deriving stock (Show)
 
-    data Value
-      = Neut {var :: Var, spine :: Spine}
-      | U
-      | Pi
-          { name :: {-# UNPACK #-} Name
-          , source :: ~Value
-          , target :: {-# UNPACK #-} Closure
-          }
-      | Lam
-          { name :: {-# UNPACK #-} Name
-          , body :: {-# UNPACK #-} Closure
-          }
-      | RowType {typ :: Value}
-      | RowCon {elems :: HashMap Name Value}
-      | RecordType {row :: Value}
-      | RecordCon {elems :: HashMap Name Value}
-      deriving stock (Show)
+data Value
+  = Neut Var Spine
+  | U
+  | Pi {-# UNPACK #-} Name ~Value Closure
+  | Lam {-# UNPACK #-} Name {-# UNPACK #-} Closure
+  | RowType Value
+  | RowCon (HashMap Name Value)
+  | RecordType Value
+  | RecordCon (HashMap Name Value)
+  deriving stock (Show)
 
-    data Var
-      = Rigid {level :: {-# UNPACK #-} Level}
-      | Flex {meta :: {-# UNPACK #-} Meta}
-      deriving stock (Show, Eq)
+data Var
+  = Rigid {-# UNPACK #-} Level
+  | Flex {-# UNPACK #-} Meta
+  deriving stock (Show, Eq)
 
-    data Spine
-      = Nil
-      | App {fun :: Spine, arg :: ~Value}
-      | RecordProj {field :: {-# UNPACK #-} Name, record :: Spine}
-      deriving stock (Show)
-    |]
+data Spine
+  = Nil
+  | App Spine ~Value
+  | RecordProj {-# UNPACK #-} Name Spine
+  deriving stock (Show)
 
 var :: Level -> Value
 var lx = Neut (Rigid lx) Nil
