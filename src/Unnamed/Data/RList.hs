@@ -1,6 +1,8 @@
 module Unnamed.Data.RList (RList, empty, cons, uncons) where
 
-import Data.Foldable (toList)
+import Relude hiding (empty, uncons)
+import Text.Show
+
 import Optics hiding (cons, uncons)
 
 data Tree a
@@ -15,6 +17,11 @@ data Trees a
 
 data RList a = RList {-# UNPACK #-} Int (Trees a)
   deriving stock (Functor, Traversable)
+  deriving anyclass
+    ( FunctorWithIndex Int
+    , FoldableWithIndex Int
+    , TraversableWithIndex Int
+    )
 
 instance Foldable RList where
   foldMap f (RList _ ts) = foldMap f ts
@@ -42,6 +49,12 @@ uncons (RList s ts0) = case ts0 of
     Node x t1 t2 ->
       let hw = w `div` 2
        in Just (x, RList (s - 1) . TCons hw t1 . TCons hw t2 $ ts)
+
+instance AsEmpty (RList a) where
+  _Empty = prism' (const empty) (null >>> bool Nothing (Just ()))
+
+instance Cons (RList a) (RList b) a b where
+  _Cons = prism (uncurry cons) (uncons >>> maybeToRight empty)
 
 type instance Index (RList a) = Int
 type instance IxValue (RList a) = a
