@@ -71,11 +71,11 @@ prettyTermWith ctx@(Context env names) = go
     App t u -> parensIf (prec > 10) $ go 10 t <+> go 11 u
     RowType a -> parensIf (prec > 10) $ "Row" <+> go 11 a
     RowCon ts ->
-      encloseSep "{ " " }" ", " $
+      align . encloseSep "{ " " }" ", " $
         itoList ts <&> \(x, t) -> pretty x <+> colon <+> go 0 t
     RecordType r -> parensIf (prec > 10) $ "Record" <+> go 11 r
     RecordCon ts ->
-      encloseSep "{ " " }" ", " $
+      align . encloseSep "{ " " }" ", " $
         itoList ts <&> \(x, t) -> pretty x <+> colon <+> go 0 t
     RecordProj f t -> go 21 t <> dot <> pretty f
 
