@@ -17,7 +17,7 @@ import Relude
 import Data.HashTable.IO (BasicHashTable)
 import Data.HashTable.IO qualified as HT
 import Data.Mutable
-import System.IO.Unsafe (unsafePerformIO)
+import System.IO.Unsafe (unsafeDupablePerformIO)
 
 import Control.Effect
 
@@ -64,11 +64,10 @@ metaCtxToIO m = do
     ( \case
         FreshMeta -> embed do
           next <- readRef nextRef
-          writeRef nextRef $ next + 1
-          pure $ Meta next
+          Meta next <$ writeRef nextRef (next + 1)
         SolveMeta meta vt -> embed $ HT.insert solveds meta vt
     )
     $ interpret
       \case
-        MetaLookup -> pure $ unsafePerformIO . HT.lookup solveds
+        MetaLookup -> pure $ unsafeDupablePerformIO . HT.lookup solveds
       m

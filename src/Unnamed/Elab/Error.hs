@@ -18,11 +18,8 @@ import Unnamed.Elab.Context (Context)
 import Unnamed.Unify.Error (UnifyError, prettyUnifyError)
 import Unnamed.Value.Pretty (prettyValue)
 
-data ElabError = ElabError
-  { pos :: {-# UNPACK #-} SourcePos
-  , context :: {-# UNPACK #-} Context
-  , error :: ElabErrorType
-  }
+data ElabError
+  = ElabError {-# UNPACK #-} SourcePos {-# UNPACK #-} Context ElabErrorType
   deriving stock (Show)
 
 data ElabErrorType
