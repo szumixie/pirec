@@ -5,6 +5,8 @@ let Nat  : _ = (N : U) -> (N -> N) -> N -> N
   ; ten      : _ = add five five
   ; hundred  : _ = mul ten ten
   ; thousand : _ = mul ten hundred
+  ; dup : Nat -> Record { fst : Nat, snd : Nat }
+        = \a. { fst = a, snd = mul a five }
   ; record : _ =
     { ten = ten, record = { hundred = hundred, thousand = thousand } }
- in { five = five, thousand = record.record.thousand }
+ in { dup = dup five, thousand = record.record.thousand }
