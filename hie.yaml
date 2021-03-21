@@ -6,3 +6,5 @@ cradle:
       component: unnamed:exe:unnamed
     - path: ./test
       component: unnamed:test:test-unnamed
+    - path: ./benchmark
+      component: unnamed:bench:bench-unnamed
