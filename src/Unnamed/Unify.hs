@@ -2,6 +2,8 @@ module Unnamed.Unify (unify) where
 
 import Relude
 
+import Data.HashMap.Lazy qualified as Map
+
 import Control.Effect
 import Control.Effect.Error
 import Optics
@@ -43,6 +45,7 @@ invert lvl = go >>> fmap \(src, m) -> Renaming src lvl m
           | Just _ <- m ^. at lx -> throw $ Nonlinear lx
           | otherwise -> pure (src + 1, m & at lx ?!~ src)
         vt' -> throw $ Nonvariable vt'
+    V.RecordProj{} -> throw ProjError
 
 rename ::
   Effs [MetaLookup, Throw UnifyError] m => Meta -> Renaming -> Value -> m Term
@@ -62,6 +65,7 @@ rename meta = goRenaming
                     | mx == meta -> throw $ OccursError meta
                     | otherwise -> pure $ Meta mx Nothing
                 V.App spine vu -> App <$> goSpine spine <*> go vu
+                V.RecordProj label spine -> RecordProj label <$> goSpine spine
            in goSpine spine0
         V.U -> pure U
         V.Pi x va closure ->
@@ -70,6 +74,10 @@ rename meta = goRenaming
         V.Lam x closure ->
           Lam x
             <$> (goRenaming (liftRenaming renaming) =<< openClosure tgt closure)
+        V.RowType va -> RowType <$> go va
+        V.RowCon ts -> RowCon <$> traverse go ts
+        V.RecordType vr -> RecordType <$> go vr
+        V.RecordCon ts -> RecordCon <$> traverse go ts
 
 solve ::
   Effs [MetaCtx, Throw UnifyError] m => Level -> Meta -> Spine -> Value -> m ()
@@ -93,6 +101,8 @@ unify lvl = go
                   (V.Nil, V.Nil) -> pass
                   (V.App spine vt, V.App spine' vt') ->
                     goSpine spine spine' *> go vt vt'
+                  (V.RecordProj label spine, V.RecordProj label' spine')
+                    | label == label' -> goSpine spine spine'
                   (spine, spine') ->
                     throw $ Mismatch (V.Neut x spine) (V.Neut x spine')
              in goSpine spine0 spine0'
@@ -114,4 +124,16 @@ unify lvl = go
         (V.Neut x spine, V.Lam _ closure) -> do
           vt <- openClosure lvl closure
           unify (lvl + 1) (V.Neut x $ V.App spine (V.var lvl)) vt
+        (V.RowType va, V.RowType va') -> go va va'
+        (V.RowCon vts, V.RowCon vts')
+          | Map.keysSet vts == Map.keysSet vts' ->
+            sequenceA_ $ Map.intersectionWith go vts vts'
+        (V.RecordType va, V.RecordType va') -> go va va'
+        (V.RecordCon vts, V.RecordCon vts')
+          | Map.keysSet vts == Map.keysSet vts' ->
+            sequenceA_ $ Map.intersectionWith go vts vts'
+        (V.RecordCon vts, V.Neut x spine) ->
+          ifor_ vts \label vt -> go vt (V.Neut x $ V.RecordProj label spine)
+        (V.Neut x spine, V.RecordCon vts) ->
+          ifor_ vts \label vt -> go (V.Neut x $ V.RecordProj label spine) vt
         (vt, vt') -> throw $ Mismatch vt vt'

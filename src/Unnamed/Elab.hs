@@ -11,6 +11,7 @@ import Unnamed.Syntax.Core (Term (..))
 import Unnamed.Syntax.Raw qualified as R
 import Unnamed.Value (Value)
 import Unnamed.Value qualified as V
+import Unnamed.Var.Name (Name)
 import Unnamed.WithPos (WithPos (..))
 
 import Unnamed.Effect.Meta
@@ -27,11 +28,7 @@ insertMeta ctx = do
 
 elabUnify ::
   Effs [MetaCtx, Throw ElabError] m =>
-  SourcePos ->
-  Context ->
-  Value ->
-  Value ->
-  m ()
+  (SourcePos -> Context -> Value -> Value -> m ())
 elabUnify pos ctx vt vt' =
   throwToThrow (ElabError pos ctx . UnifyError vt vt') $
     unify (ctx ^. #level) vt vt'
@@ -103,3 +100,36 @@ checkInfer ctx = (goCheck, goInfer)
       vu <- eval (ctx ^. #env) u
       vb <- appClosure closure vu
       pure (App t u, vb)
+    R.RowType ra -> do
+      a <- goCheck ra V.U
+      pure (RowType a, V.U)
+    R.RowCon [] -> do
+      va <- eval (ctx ^. #env) =<< insertMeta ctx
+      pure (RowCon mempty, va)
+    R.RowCon ((x1, rt1) : rts) -> do
+      (t1, va) <- goInfer rt1
+      rts' <- labelsUnique pos ctx ((x1, rt1) : rts)
+      ts <- ifor rts' \x t -> if x == x1 then pure t1 else goCheck t va
+      pure (RowCon ts, V.RowType va)
+    R.RecordType rr -> do
+      r <- goCheck rr $ V.RowType V.U
+      pure (RecordType r, V.U)
+    R.RecordCon rts -> do
+      rts' <- labelsUnique pos ctx rts
+      tvas <- traverse goInfer rts'
+      pure (RecordCon $ fst <$> tvas, V.RecordType $ V.RowCon $ snd <$> tvas)
+    R.RecordProj label rt -> do
+      (t, vr0) <- goInfer rt
+      forceValue vr0 >>= \case
+        V.RecordType (V.RowCon as)
+          | Just a <- as ^. at label -> pure (RecordProj label t, a)
+        vr -> throw $ ElabError pos ctx (FieldExpected label vr)
+
+labelsUnique ::
+  Eff (Throw ElabError) m =>
+  (SourcePos -> Context -> [(Name, a)] -> m (HashMap Name a))
+labelsUnique pos ctx = foldlM go mempty
+ where
+  go m (x, t)
+    | Just _ <- m ^. at x = throw $ ElabError pos ctx (DupField x)
+    | otherwise = pure $ m & at x ?!~ t

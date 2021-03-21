@@ -12,7 +12,7 @@ import Text.Megaparsec.Char (letterChar, space1)
 import Text.Megaparsec.Char.Lexer qualified as L
 
 import Unnamed.Syntax.Raw qualified as R
-import Unnamed.Var.Name (name)
+import Unnamed.Var.Name (Name, name)
 import Unnamed.WithPos (WithPos (..))
 
 type Parser = Parsec Void Text
@@ -31,24 +31,32 @@ keyword :: Text -> Parser Text
 keyword kw = lexeme $ chunk kw <* notFollowedBy letterChar
 
 keywords :: HashSet Text
-keywords = Set.fromList ["let", "in", "U"]
+keywords = Set.fromList ["let", "in", "U", "Row", "Record"]
 
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
 
-uscore, let_, equals, semicolon, in_, univ, arrow, colon, lambda, dot :: Parser Text
+braces :: Parser a -> Parser a
+braces = between (symbol "{") (symbol "}")
+
+uscore, equals, semicolon, arrow, colon, lambda, dot, comma :: Parser Text
 uscore = symbol "_"
-let_ = keyword "let"
 equals = symbol "="
 semicolon = symbol ";"
-in_ = keyword "in"
-univ = keyword "U"
 arrow = symbol "->"
 colon = symbol ":"
 lambda = symbol "\\"
 dot = symbol "."
+comma = symbol ","
 
-ident :: Parser Text
+let_, in_, univ, row, record :: Parser Text
+let_ = keyword "let"
+in_ = keyword "in"
+univ = keyword "U"
+row = keyword "Row"
+record = keyword "Record"
+
+ident :: Parser Name
 ident = lexeme $ try do
   offset <- getOffset
   text <- takeWhile1P (Just "identifier") isLetter
@@ -56,7 +64,7 @@ ident = lexeme $ try do
     then
       region (setErrorOffset offset) . label "identifier" $
         unexpected (Tokens $ text & toString & NE.fromList)
-    else pure text
+    else pure $ name text
 
 parser :: Parser R.Term
 parser = spaceConsumer *> term <* eof
@@ -73,13 +81,23 @@ termPrec prec
     option (pfs t) $ pfs . WithPos pos . R.Pi "_" t <$ arrow <*> termPrec 0
   | prec <= 10 = do
     pos <- getSourcePos
-    some (termPrec 11) <&> foldl1' \t u -> WithPos pos $ R.App t u
+    choice
+      [ WithPos pos <$> choice [termRowType, termRecordType]
+      , some (termPrec 11) <&> foldl1' \t u -> WithPos pos $ R.App t u
+      ]
+  | prec <= 20 = do
+    t <- termPrec 21
+    flipfoldl' ($) t <$> many termRecordProj
   | otherwise =
     parens term
-      <|> WithPos <$> getSourcePos <*> choice [termVar, termHole, termU]
+      <|> termWithPos
+        (choice [termVar, termHole, termU, try termRowCon, termRecordCon])
+
+termWithPos :: Parser R.Term' -> Parser R.Term
+termWithPos p = WithPos <$> getSourcePos <*> p
 
 termVar :: Parser R.Term'
-termVar = R.Var . name <$> ident
+termVar = R.Var <$> ident
 
 termHole :: Parser R.Term'
 termHole = R.Hole <$ uscore
@@ -89,7 +107,7 @@ termLet = foldr (.) id <$ let_ <*> def `sepEndBy1` semicolon <* in_
  where
   def = do
     pos <- getSourcePos
-    f <- R.Let <$> (name <$> ident) <* colon <*> term <* equals <*> term
+    f <- R.Let <$> ident <* colon <*> term <* equals <*> term
     pure $ WithPos pos . f
 
 termU :: Parser R.Term'
@@ -101,7 +119,7 @@ termPi = foldr (.) id . join <$> some (parens binder) <* arrow
   binder = do
     f <- some do
       pos <- getSourcePos
-      f <- R.Pi <$> (name <$> ident)
+      f <- R.Pi <$> ident
       pure \a b -> WithPos pos $ f a b
     a <- colon *> term
     pure $ ($ a) <$> f
@@ -111,5 +129,25 @@ termLam = foldr (.) id <$ lambda <*> some binder <* dot
  where
   binder = do
     pos <- getSourcePos
-    f <- R.Lam <$> (name <$> ident)
+    f <- R.Lam <$> ident
     pure $ WithPos pos . f
+
+termRowType :: Parser R.Term'
+termRowType = R.RowType <$ row <*> termPrec 11
+
+termRowCon :: Parser R.Term'
+termRowCon =
+  braces $ R.RowCon <$> ((,) <$> ident <* colon <*> term) `sepBy1` comma
+
+termRecordType :: Parser R.Term'
+termRecordType = R.RecordType <$ record <*> termPrec 11
+
+termRecordCon :: Parser R.Term'
+termRecordCon =
+  braces $ R.RecordCon <$> ((,) <$> ident <* equals <*> term) `sepBy1` comma
+
+termRecordProj :: Parser (R.Term -> R.Term)
+termRecordProj = do
+  pos <- getSourcePos
+  f <- dot *> ident
+  pure $ WithPos pos . R.RecordProj f

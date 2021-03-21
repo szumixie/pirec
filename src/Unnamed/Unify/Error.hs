@@ -23,6 +23,7 @@ declareFieldLabels
       | OccursError {meta :: Meta}
       | Nonlinear {level :: Level}
       | Nonvariable {value :: Value}
+      | ProjError
       deriving stock (Show)
     |]
 
@@ -44,3 +45,4 @@ prettyUnifyError ctx = \case
   Nonvariable vt -> do
     pt <- prettyValue ctx vt
     pure $ "got nonvariable in the context:" <> line <> pt
+  ProjError -> pure "cannot invert record projection"

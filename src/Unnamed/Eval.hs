@@ -21,6 +21,7 @@ import Unnamed.Value (Closure, Spine, Value)
 import Unnamed.Value qualified as V
 import Unnamed.Var.Level (Level)
 import Unnamed.Var.Meta (Meta)
+import Unnamed.Var.Name (Name)
 
 import Unnamed.Effect.Meta
 
@@ -43,6 +44,11 @@ eval env0 t0 = do
           Pi x a b -> V.Pi x (go a) $ V.Closure env b
           Lam x t -> V.Lam x $ V.Closure env t
           App t u -> appValuePure mget (go t) (go u)
+          RowType a -> V.RowType $ go a
+          RowCon ts -> V.RowCon $ go <$> ts
+          RecordType r -> V.RecordType $ go r
+          RecordCon ts -> V.RecordCon $ go <$> ts
+          RecordProj label t -> recordProjValue label $ go t
   pure $ goEnv env0 t0
 
 appClosure :: Eff MetaLookup m => Closure -> Value -> m Value
@@ -57,12 +63,19 @@ appValue vt vu = case vt of
 appValuePure :: (Meta -> Maybe Value) -> Value -> Value -> Value
 appValuePure mget vt vu = run $ runMetaLookup mget $ appValue vt vu
 
+recordProjValue :: Name -> Value -> Value
+recordProjValue label = \case
+  V.Neut x spine -> V.Neut x $ V.RecordProj label spine
+  V.RecordCon vts -> vts ^. at label ?: error "bug"
+  _ -> error "bug"
+
 appSpine :: Eff MetaLookup m => Value -> Spine -> m Value
 appSpine vt = go
  where
   go = \case
     V.Nil -> pure vt
     V.App spine vu -> go spine >>= \vt' -> appValue vt' vu
+    V.RecordProj label spine -> go spine <&> \vt' -> recordProjValue label vt'
 
 forceValue :: Eff MetaLookup m => Value -> m Value
 forceValue vt0 = case vt0 of
@@ -83,12 +96,17 @@ quote !lvl = go
                 V.Rigid lx -> Var lx
                 V.Flex mx -> Meta mx Nothing
               V.App spine vt -> App <$> goSpine spine <*> go vt
+              V.RecordProj label spine -> RecordProj label <$> goSpine spine
          in goSpine spine0
       V.U -> pure U
       V.Pi x va closure ->
         Pi x <$> go va <*> (quote (lvl + 1) =<< openClosure lvl closure)
       V.Lam x closure ->
         Lam x <$> (quote (lvl + 1) =<< openClosure lvl closure)
+      V.RowType va -> RowType <$> go va
+      V.RowCon vts -> RowCon <$> traverse go vts
+      V.RecordType vr -> RecordType <$> go vr
+      V.RecordCon vts -> RecordCon <$> traverse go vts
 
 openClosure :: Eff MetaLookup m => Level -> Closure -> m Value
 openClosure lvl closure = appClosure closure (V.var lvl)

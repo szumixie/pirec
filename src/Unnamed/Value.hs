@@ -34,6 +34,10 @@ declareFieldLabels
           { name :: {-# UNPACK #-} Name
           , body :: {-# UNPACK #-} Closure
           }
+      | RowType {typ :: Value}
+      | RowCon {elems :: HashMap Name Value}
+      | RecordType {row :: Value}
+      | RecordCon {elems :: HashMap Name Value}
       deriving stock (Show)
 
     data Var
@@ -44,6 +48,7 @@ declareFieldLabels
     data Spine
       = Nil
       | App {fun :: Spine, arg :: ~Value}
+      | RecordProj {field :: {-# UNPACK #-} Name, record :: Spine}
       deriving stock (Show)
     |]
 

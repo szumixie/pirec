@@ -31,6 +31,9 @@ declareFieldLabels
     data ElabErrorType
       = UnifyError {expected :: Value, inferred :: Value, error :: UnifyError}
       | ScopeError {name :: {-# UNPACK #-} Name}
+      | DupField {field :: {-# UNPACK #-} Name}
+      | FieldMismatch {termset :: HashSet Name, typeset :: HashSet Name}
+      | FieldExpected {field :: {-# UNPACK #-} Name, typ :: Value}
       deriving stock (Show)
     |]
 
@@ -50,4 +53,16 @@ prettyElabError (ElabError pos ctx err) = do
           , pa'
           ]
     ScopeError x -> pure $ "variable" <+> pretty x <+> "out of scope"
+    DupField label -> pure $ "duplicate field" <+> pretty label <+> "in row"
+    FieldMismatch tset aset ->
+      pure $
+        vsep
+          [ "expected record with fields:"
+          , pretty $ toList aset
+          , "but got record with fields:"
+          , pretty $ toList tset
+          ]
+    FieldExpected label va -> do
+      pa <- prettyValue ctx va
+      pure $ "expected field" <+> pretty label <+> "in type:" <> line <> pa
   pure $ pretty (sourcePosPretty pos) <> colon <> line <> perr
