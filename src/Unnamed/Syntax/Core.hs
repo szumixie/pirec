@@ -1,16 +1,19 @@
 module Unnamed.Syntax.Core (Term (..)) where
 
+import Relude
+
 import Optics (declareFieldLabels)
 
-import Data.HashMap.Strict (HashMap)
-
+import Unnamed.BoundMask (BoundMask)
 import Unnamed.Var.Level (Level)
+import Unnamed.Var.Meta (Meta)
 import Unnamed.Var.Name (Name)
 
 declareFieldLabels
   [d|
     data Term
       = Var {level :: {-# UNPACK #-} Level}
+      | Meta {meta :: {-# UNPACK #-} Meta, boundMask :: Maybe BoundMask}
       | Let
           { name :: {-# UNPACK #-} Name
           , typ :: Term

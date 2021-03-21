@@ -1,5 +1,7 @@
 module Unnamed.WithPos (WithPos (..), withPos) where
 
+import Relude
+
 import Optics
 import Text.Megaparsec (SourcePos)
 

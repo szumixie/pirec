@@ -1,10 +1,10 @@
-let Nat  : U = (N : U) -> (N -> N) -> N -> N
+let Nat  : _ = (N : U) -> (N -> N) -> N -> N
   ; five : Nat = \N s z. s (s (s (s (s z))))
   ; add  : Nat -> Nat -> Nat = \a b N s z. a N s (b N s z)
   ; mul  : Nat -> Nat -> Nat = \a b N s z. a N (b N s) z
-  ; ten      : Nat = add five five
-  ; hundred  : Nat = mul ten ten
-  ; thousand : Nat = mul ten hundred
-  ; record : Record { ten : Nat, record : Record { hundred : Nat, thousand : Nat } }
-           = { ten = ten, record = { hundred = hundred, thousand = thousand } }
+  ; ten      : _ = add five five
+  ; hundred  : _ = mul ten ten
+  ; thousand : _ = mul ten hundred
+  ; record : _ =
+    { ten = ten, record = { hundred = hundred, thousand = thousand } }
  in { five = five, thousand = record.record.thousand }

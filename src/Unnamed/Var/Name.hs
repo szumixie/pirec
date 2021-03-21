@@ -1,9 +1,7 @@
 module Unnamed.Var.Name (Name (..), name) where
 
-import Data.Hashable (Hashable)
-import Data.String (IsString)
+import Relude
 
-import Data.Text (Text)
 import Data.Text.Short (ShortText)
 import Data.Text.Short qualified as TS
 

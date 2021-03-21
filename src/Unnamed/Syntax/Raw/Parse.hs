@@ -1,18 +1,11 @@
 module Unnamed.Syntax.Raw.Parse (Parser, parser) where
 
-import Control.Monad (join)
+import Relude hiding (many, some)
+
 import Data.Char (isLetter)
-import Data.Foldable (foldl')
-import Data.Function ((&))
-import Data.Functor ((<&>))
+import Data.HashSet qualified as Set
 import Data.List (foldl1')
 import Data.List.NonEmpty qualified as NE
-import Data.Void (Void)
-
-import Data.HashSet (HashSet)
-import Data.HashSet qualified as Set
-import Data.Text (Text)
-import Data.Text qualified as Text
 
 import Text.Megaparsec
 import Text.Megaparsec.Char (letterChar, space1)
@@ -38,7 +31,7 @@ keyword :: Text -> Parser Text
 keyword kw = lexeme $ chunk kw <* notFollowedBy letterChar
 
 keywords :: HashSet Text
-keywords = Set.fromList ["let", "in", "U", "Row", "Rec"]
+keywords = Set.fromList ["let", "in", "U", "Row", "Record"]
 
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
@@ -46,7 +39,8 @@ parens = between (symbol "(") (symbol ")")
 braces :: Parser a -> Parser a
 braces = between (symbol "{") (symbol "}")
 
-equals, semicolon, arrow, colon, lambda, dot, comma :: Parser Text
+uscore, equals, semicolon, arrow, colon, lambda, dot, comma :: Parser Text
+uscore = symbol "_"
 equals = symbol "="
 semicolon = symbol ";"
 arrow = symbol "->"
@@ -69,7 +63,7 @@ ident = lexeme $ try do
   if text `Set.member` keywords
     then
       region (setErrorOffset offset) . label "identifier" $
-        unexpected (Tokens $ text & Text.unpack & NE.fromList)
+        unexpected (Tokens $ text & toString & NE.fromList)
     else pure $ name text
 
 parser :: Parser R.Term
@@ -93,16 +87,20 @@ termPrec prec
       ]
   | prec <= 20 = do
     t <- termPrec 21
-    foldl' (flip ($)) t <$> many termRecordProj
+    flipfoldl' ($) t <$> many termRecordProj
   | otherwise =
     parens term
-      <|> termWithPos (choice [termVar, termU, try termRowCon, termRecordCon])
+      <|> termWithPos
+        (choice [termVar, termHole, termU, try termRowCon, termRecordCon])
 
 termWithPos :: Parser R.Term' -> Parser R.Term
 termWithPos p = WithPos <$> getSourcePos <*> p
 
 termVar :: Parser R.Term'
 termVar = R.Var <$> ident
+
+termHole :: Parser R.Term'
+termHole = R.Hole <$ uscore
 
 termLet :: Parser (R.Term -> R.Term)
 termLet = foldr (.) id <$ let_ <*> def `sepEndBy1` semicolon <* in_
@@ -138,7 +136,8 @@ termRowType :: Parser R.Term'
 termRowType = R.RowType <$ row <*> termPrec 11
 
 termRowCon :: Parser R.Term'
-termRowCon = braces $ R.RowCon <$> ((,) <$> ident <* colon <*> term) `sepBy1` comma
+termRowCon =
+  braces $ R.RowCon <$> ((,) <$> ident <* colon <*> term) `sepBy1` comma
 
 termRecordType :: Parser R.Term'
 termRecordType = R.RecordType <$ record <*> termPrec 11

@@ -1,6 +1,6 @@
 module Unnamed.Var.Level (Level (..)) where
 
-import Data.Hashable (Hashable)
+import Relude
 
 import Optics (declareFieldLabels)
 

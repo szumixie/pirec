@@ -1,5 +1,7 @@
 module Unnamed.Syntax.Raw (Term, Term' (..)) where
 
+import Relude
+
 import Optics (declareFieldLabels)
 
 import Unnamed.Var.Name (Name)
@@ -11,6 +13,7 @@ declareFieldLabels
 
     data Term'
       = Var {name :: {-# UNPACK #-} Name}
+      | Hole
       | Let
           { name :: {-# UNPACK #-} Name
           , typ :: {-# UNPACK #-} Term

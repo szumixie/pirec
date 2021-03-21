@@ -1,18 +1,20 @@
 module Unnamed.Value (
   Closure (..),
   Value (..),
-  Neutral (..),
+  Var (..),
+  Spine (..),
   var,
-  app,
+  meta,
 ) where
 
-import Data.HashMap.Strict (HashMap)
+import Relude
 
 import Optics (declareFieldLabels)
 
 import Unnamed.Env (Env)
 import Unnamed.Syntax.Core (Term)
 import Unnamed.Var.Level (Level (..))
+import Unnamed.Var.Meta (Meta)
 import Unnamed.Var.Name (Name)
 
 declareFieldLabels
@@ -21,7 +23,7 @@ declareFieldLabels
       deriving stock (Show)
 
     data Value
-      = Neut {neut :: Neutral}
+      = Neut {var :: Var, spine :: Spine}
       | U
       | Pi
           { name :: {-# UNPACK #-} Name
@@ -38,15 +40,20 @@ declareFieldLabels
       | RecordCon {elems :: HashMap Name Value}
       deriving stock (Show)
 
-    data Neutral
-      = Var {level :: {-# UNPACK #-} Level}
-      | App {fun :: Neutral, arg :: ~Value}
-      | RecordProj {field :: {-# UNPACK #-} Name, record :: Neutral}
+    data Var
+      = Rigid {level :: {-# UNPACK #-} Level}
+      | Flex {meta :: {-# UNPACK #-} Meta}
+      deriving stock (Show, Eq)
+
+    data Spine
+      = Nil
+      | App {fun :: Spine, arg :: ~Value}
+      | RecordProj {field :: {-# UNPACK #-} Name, record :: Spine}
       deriving stock (Show)
     |]
 
 var :: Level -> Value
-var = Neut . Var
+var lx = Neut (Rigid lx) Nil
 
-app :: Neutral -> Value -> Value
-app t u = Neut $ App t u
+meta :: Meta -> Value
+meta mx = Neut (Flex mx) Nil

@@ -4,60 +4,65 @@ module Unnamed.Elab.Error (
   prettyElabError,
 ) where
 
-import Data.Foldable (toList)
+import Relude
+
+import Control.Effect
 import Data.Text.Prettyprint.Doc
 import Optics (declareFieldLabels)
 import Text.Megaparsec (SourcePos, sourcePosPretty)
 
-import Data.HashSet (HashSet)
-import Unnamed.Elab.Context (Context)
 import Unnamed.Value (Value)
-import Unnamed.Value.Pretty (prettyValue)
 import Unnamed.Var.Name (Name)
+
+import Unnamed.Effect.Meta
+import Unnamed.Elab.Context (Context)
+import Unnamed.Unify.Error (UnifyError, prettyUnifyError)
+import Unnamed.Value.Pretty (prettyValue)
 
 declareFieldLabels
   [d|
     data ElabError = ElabError
       { pos :: {-# UNPACK #-} SourcePos
-      , ctx :: {-# UNPACK #-} Context
-      , err :: ElabErrorType
+      , context :: {-# UNPACK #-} Context
+      , error :: ElabErrorType
       }
       deriving stock (Show)
 
     data ElabErrorType
-      = ConvError {expected :: Value, inferred :: Value}
+      = UnifyError {expected :: Value, inferred :: Value, error :: UnifyError}
       | ScopeError {name :: {-# UNPACK #-} Name}
-      | LamInference
-      | PiExpected {typ :: Value}
       | DupField {field :: {-# UNPACK #-} Name}
-      | EmptyRowInference
       | FieldMismatch {termset :: HashSet Name, typeset :: HashSet Name}
       | FieldExpected {field :: {-# UNPACK #-} Name, typ :: Value}
       deriving stock (Show)
     |]
 
-prettyElabError :: ElabError -> Doc ann
-prettyElabError (ElabError pos ctx err) =
-  pretty (sourcePosPretty pos) <> colon <> line <> case err of
-    ConvError a a' ->
-      vsep
-        [ "expected type:"
-        , prettyValue ctx a
-        , "but got inferred type:"
-        , prettyValue ctx a'
-        ]
-    ScopeError x -> "variable" <+> pretty x <+> "out of scope"
-    LamInference -> "cannot infer type of lambda"
-    PiExpected a ->
-      "expected function type but got inferred type:" <+> prettyValue ctx a
-    DupField x -> "duplicate field" <+> pretty x <+> "in row"
-    EmptyRowInference -> "cannot infer type of empty row"
+prettyElabError :: Eff MetaLookup m => ElabError -> m (Doc ann)
+prettyElabError (ElabError pos ctx err) = do
+  perr <- case err of
+    UnifyError va va' uerr -> do
+      puerr <- prettyUnifyError ctx uerr
+      pa <- prettyValue ctx va
+      pa' <- prettyValue ctx va'
+      pure $
+        vsep
+          [ puerr
+          , "when unifying expected type:"
+          , pa
+          , "with inferred type:"
+          , pa'
+          ]
+    ScopeError x -> pure $ "variable" <+> pretty x <+> "out of scope"
+    DupField label -> pure $ "duplicate field" <+> pretty label <+> "in row"
     FieldMismatch tset aset ->
-      vsep
-        [ "expected record with fields:"
-        , pretty $ toList aset
-        , "but got record with fields:"
-        , pretty $ toList tset
-        ]
-    FieldExpected f a ->
-      "expected field" <+> pretty f <+> "in type:" <> line <> prettyValue ctx a
+      pure $
+        vsep
+          [ "expected record with fields:"
+          , pretty $ toList aset
+          , "but got record with fields:"
+          , pretty $ toList tset
+          ]
+    FieldExpected label va -> do
+      pa <- prettyValue ctx va
+      pure $ "expected field" <+> pretty label <+> "in type:" <> line <> pa
+  pure $ pretty (sourcePosPretty pos) <> colon <> line <> perr
