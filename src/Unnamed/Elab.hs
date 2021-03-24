@@ -104,7 +104,7 @@ checkInfer ctx = (goCheck, goInfer)
       pure (RowType a, V.U)
     R.RowCon [] -> do
       va <- eval (ctx ^. #env) =<< insertMeta ctx
-      pure (RowCon mempty, va)
+      pure (RowCon mempty, V.RowType va)
     R.RowCon ((x1, rt1) : rts) -> do
       (t1, va) <- goInfer rt1
       rts' <- labelsUnique ctx ((x1, rt1) : rts)
