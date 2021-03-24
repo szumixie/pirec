@@ -20,7 +20,7 @@ import Unnamed.Elab.Context qualified as Ctx
 import Unnamed.Elab.Error (prettyElabError)
 import Unnamed.Eval (normal)
 import Unnamed.Syntax.Core.Pretty (prettyTerm)
-import Unnamed.Syntax.Raw.Parse qualified as R
+import Unnamed.Syntax.Raw.Parse (parseRaw)
 import Unnamed.Value.Pretty (prettyValue)
 
 newtype Options = Options FilePath
@@ -32,8 +32,8 @@ opts = Options <$> strArgument (metavar "PATH")
 main :: IO ()
 main = withUtf8 do
   Options fp <- execParser $ info (opts <**> helper) mempty
-  content <- Utf8.readFile fp
-  raw <- case MP.parse R.parser fp content of
+  input <- Utf8.readFile fp
+  raw <- case parseRaw fp input of
     Right raw -> pure raw
     Left err -> hPutStr stderr (MP.errorBundlePretty err) *> exitFailure
   runM $ metaCtxToIO do
@@ -41,8 +41,8 @@ main = withUtf8 do
       errorToIO (infer Ctx.empty raw) >>= \case
         Right tva -> pure tva
         Left err -> do
-          perr <- prettyElabError err
-          embed $ PP.hPutDoc stderr perr *> exitFailure
+          perr <- prettyElabError err fp input
+          embed $ hPutStr stderr perr *> exitFailure
     t' <- normal t
     pa <- prettyValue Ctx.empty va
     embed . PP.putDoc $ prettyTerm t' <> PP.line <> PP.colon <+> pa

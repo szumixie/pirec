@@ -1,27 +1,22 @@
-module Unnamed.Syntax.Raw (Term, Term' (..)) where
+module Unnamed.Syntax.Raw (Term (..)) where
 
 import Relude
 
+import Unnamed.Data.Span (Span)
 import Unnamed.Var.Name (Name)
-import Unnamed.WithPos (WithPos)
 
-type Term = WithPos Term'
-
-data Term'
-  = Var {-# UNPACK #-} Name
+data Term
+  = Span {-# UNPACK #-} Span Term
+  | Var {-# UNPACK #-} Name
   | Hole
-  | Let
-      {-# UNPACK #-} Name
-      {-# UNPACK #-} Term
-      {-# UNPACK #-} Term
-      {-# UNPACK #-} Term
+  | Let {-# UNPACK #-} Name Term Term Term
   | U
-  | Pi {-# UNPACK #-} Name {-# UNPACK #-} Term {-# UNPACK #-} Term
-  | Lam {-# UNPACK #-} Name {-# UNPACK #-} Term
-  | App {-# UNPACK #-} Term {-# UNPACK #-} Term
-  | RowType {-# UNPACK #-} Term
+  | Pi {-# UNPACK #-} Name Term Term
+  | Lam {-# UNPACK #-} Name Term
+  | App Term Term
+  | RowType Term
   | RowCon [(Name, Term)]
-  | RecordType {-# UNPACK #-} Term
+  | RecordType Term
   | RecordCon [(Name, Term)]
-  | RecordProj {-# UNPACK #-} Name {-# UNPACK #-} Term
+  | RecordProj {-# UNPACK #-} Name Term
   deriving stock (Show)

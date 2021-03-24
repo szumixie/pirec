@@ -5,14 +5,12 @@ import Relude
 import Control.Effect
 import Control.Effect.Error
 import Optics
-import Text.Megaparsec (SourcePos)
 
 import Unnamed.Syntax.Core (Term (..))
 import Unnamed.Syntax.Raw qualified as R
 import Unnamed.Value (Value)
 import Unnamed.Value qualified as V
 import Unnamed.Var.Name (Name)
-import Unnamed.WithPos (WithPos (..))
 
 import Unnamed.Effect.Meta
 import Unnamed.Elab.Context (Context)
@@ -27,10 +25,9 @@ insertMeta ctx = do
   pure $ Meta meta (Just $ ctx ^. #boundMask)
 
 elabUnify ::
-  Effs [MetaCtx, Throw ElabError] m =>
-  (SourcePos -> Context -> Value -> Value -> m ())
-elabUnify pos ctx vt vt' =
-  throwToThrow (ElabError pos ctx . UnifyError vt vt') $
+  Effs [MetaCtx, Throw ElabError] m => Context -> Value -> Value -> m ()
+elabUnify ctx vt vt' =
+  throwToThrow (ElabError ctx . UnifyError vt vt') $
     unify (ctx ^. #level) vt vt'
 
 check ::
@@ -47,7 +44,8 @@ checkInfer ::
   (R.Term -> Value -> m Term, R.Term -> m (Term, Value))
 checkInfer ctx = (goCheck, goInfer)
  where
-  goCheck rtpos@(WithPos pos rt0) va0 = case (rt0, va0) of
+  goCheck = curry \case
+    (R.Span span rt, va) -> check (ctx & #span .~ span) rt va
     (R.Hole, _) -> insertMeta ctx
     (R.Let x ra rt ru, vb) -> do
       a <- goCheck ra V.U
@@ -59,13 +57,14 @@ checkInfer ctx = (goCheck, goInfer)
     (R.Lam x rt, V.Pi _ va closure) -> do
       vb <- openClosure (ctx ^. #level) closure
       Lam x <$> check (ctx & Ctx.bind x va) rt vb
-    (_, va) -> do
-      (t, va') <- goInfer rtpos
-      t <$ elabUnify pos ctx va va'
+    (rt, va) -> do
+      (t, va') <- goInfer rt
+      t <$ elabUnify ctx va va'
 
-  goInfer (WithPos pos rt0) = case rt0 of
+  goInfer = \case
+    R.Span span rt -> infer (ctx & #span .~ span) rt
     R.Var x -> case ctx ^. #names % at x of
-      Nothing -> throw $ ElabError pos ctx (ScopeError x)
+      Nothing -> throw $ ElabError ctx (ScopeError x)
       Just (lx, va) -> pure (Var lx, va)
     R.Hole -> (,) <$> insertMeta ctx <*> (eval (ctx ^. #env) =<< insertMeta ctx)
     R.Let x ra rt ru -> do
@@ -95,7 +94,7 @@ checkInfer ctx = (goCheck, goInfer)
             va <- eval (ctx ^. #env) =<< insertMeta ctx
             closure <-
               V.Closure (ctx ^. #env) <$> insertMeta (ctx & Ctx.bind "x" va)
-            (va, closure) <$ elabUnify pos ctx vp (V.Pi "x" va closure)
+            (va, closure) <$ elabUnify ctx vp (V.Pi "x" va closure)
       u <- goCheck ru va
       vu <- eval (ctx ^. #env) u
       vb <- appClosure closure vu
@@ -108,14 +107,14 @@ checkInfer ctx = (goCheck, goInfer)
       pure (RowCon mempty, va)
     R.RowCon ((x1, rt1) : rts) -> do
       (t1, va) <- goInfer rt1
-      rts' <- labelsUnique pos ctx ((x1, rt1) : rts)
+      rts' <- labelsUnique ctx ((x1, rt1) : rts)
       ts <- ifor rts' \x t -> if x == x1 then pure t1 else goCheck t va
       pure (RowCon ts, V.RowType va)
     R.RecordType rr -> do
       r <- goCheck rr $ V.RowType V.U
       pure (RecordType r, V.U)
     R.RecordCon rts -> do
-      rts' <- labelsUnique pos ctx rts
+      rts' <- labelsUnique ctx rts
       tvas <- traverse goInfer rts'
       pure (RecordCon $ fst <$> tvas, V.RecordType $ V.RowCon $ snd <$> tvas)
     R.RecordProj label rt -> do
@@ -123,13 +122,12 @@ checkInfer ctx = (goCheck, goInfer)
       forceValue vr0 >>= \case
         V.RecordType (V.RowCon as)
           | Just a <- as ^. at label -> pure (RecordProj label t, a)
-        vr -> throw $ ElabError pos ctx (FieldExpected label vr)
+        vr -> throw $ ElabError ctx (FieldExpected label vr)
 
 labelsUnique ::
-  Eff (Throw ElabError) m =>
-  (SourcePos -> Context -> [(Name, a)] -> m (HashMap Name a))
-labelsUnique pos ctx = foldlM go mempty
+  Eff (Throw ElabError) m => Context -> [(Name, a)] -> m (HashMap Name a)
+labelsUnique ctx = foldlM go mempty
  where
   go m (x, t)
-    | Just _ <- m ^. at x = throw $ ElabError pos ctx (DupField x)
+    | Just _ <- m ^. at x = throw $ ElabError ctx (DupField x)
     | otherwise = pure $ m & at x ?!~ t

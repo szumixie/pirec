@@ -6,6 +6,7 @@ import Optics
 
 import Unnamed.BoundMask (BoundMask)
 import Unnamed.BoundMask qualified as BM
+import Unnamed.Data.Span (Span (..))
 import Unnamed.Env (Env)
 import Unnamed.Env qualified as Env
 import Unnamed.Value (Value)
@@ -13,11 +14,11 @@ import Unnamed.Value qualified as V
 import Unnamed.Var.Level (Level)
 import Unnamed.Var.Name (Name)
 
-declareFieldLabelsWith
-  (noPrefixFieldLabels & generateUpdateableOptics .~ False)
+declareFieldLabels
   [d|
     data Context = Context
-      { level :: {-# UNPACK #-} Level
+      { span :: Span
+      , level :: {-# UNPACK #-} Level
       , env :: Env Value
       , names :: HashMap Name (Level, Value)
       , boundMask :: BoundMask
@@ -26,19 +27,21 @@ declareFieldLabelsWith
     |]
 
 empty :: Context
-empty = Context 0 Env.empty mempty BM.empty
+empty = Context (Span 0 0) 0 Env.empty mempty BM.empty
 
 extend :: Name -> Value -> Value -> Context -> Context
-extend x va vt (Context lvl env names mask) =
+extend x va vt (Context span lvl env names mask) =
   Context
+    span
     (lvl + 1)
     (env & Env.extend vt)
     (names & at x ?~ (lvl, va))
     mask
 
 bind :: Name -> Value -> Context -> Context
-bind x va (Context lvl env names mask) =
+bind x va (Context span lvl env names mask) =
   Context
+    span
     (lvl + 1)
     (env & Env.extend (V.var lvl))
     (names & at x ?~ (lvl, va))
