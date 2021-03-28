@@ -57,12 +57,12 @@ addPrec p = \case
           choice
             [ do
                 f <- choice sf
-                end <- getOffset
+                end <- get
                 go $ R.Span (Span start end) (f x)
             , do
                 f <- choice infl
                 y <- p
-                end <- getOffset
+                end <- get
                 go $ R.Span (Span start end) (f x y)
             , pure x
             ]
