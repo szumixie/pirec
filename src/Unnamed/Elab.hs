@@ -137,10 +137,10 @@ checkInfer ctx = (goCheck, goInfer)
     R.RecordType rr -> do
       r <- goCheck rr $ V.RowType LS.full V.U
       pure (RecordType r, V.U)
-    R.RecordCon rts -> do
+    R.RecordLit rts -> do
       rts' <- labelsUnique ctx rts
       tvas <- traverse goInfer rts'
-      pure (RecordCon $ fst <$> tvas, V.RecordType $ V.RowLit (snd <$> tvas))
+      pure (RecordLit $ fst <$> tvas, V.RecordType $ V.RowLit (snd <$> tvas))
     R.RecordProj label rt -> do
       (t, vr0) <- goInfer rt
       forceValue vr0 >>= \case

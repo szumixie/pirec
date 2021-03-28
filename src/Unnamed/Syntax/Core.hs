@@ -20,6 +20,6 @@ data Term
   | RowLit (HashMap Name Term)
   | RowCons (HashMap Name Term) Term
   | RecordType Term
-  | RecordCon (HashMap Name Term)
+  | RecordLit (HashMap Name Term)
   | RecordProj {-# UNPACK #-} Name Term
   deriving stock (Show)

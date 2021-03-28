@@ -86,7 +86,7 @@ prettyTermWith ctx@(Context env names) = go
         <> go 0 r
         <> " }"
     RecordType r -> parensIf (prec > 10) $ "Record" <+> go 11 r
-    RecordCon ts ->
+    RecordLit ts ->
       align . encloseSep "{ " " }" ", " $
         itoList ts <&> \(x, t) -> pretty x <+> colon <+> go 0 t
     RecordProj label t -> go 21 t <> dot <> pretty label

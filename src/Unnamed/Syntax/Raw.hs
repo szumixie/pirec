@@ -18,6 +18,6 @@ data Term
   | RowLit [(Name, Term)]
   | RowCons [(Name, Term)] Term
   | RecordType Term
-  | RecordCon [(Name, Term)]
+  | RecordLit [(Name, Term)]
   | RecordProj {-# UNPACK #-} Name Term
   deriving stock (Show)

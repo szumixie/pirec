@@ -48,7 +48,7 @@ eval env0 t0 = do
           RowLit ts -> V.RowLit $ go <$> ts
           RowCons ts r -> rowConsValue (go <$> ts) (go r)
           RecordType r -> V.RecordType $ go r
-          RecordCon ts -> V.RecordCon $ go <$> ts
+          RecordLit ts -> V.RecordLit $ go <$> ts
           RecordProj label t -> recordProjValue label $ go t
   pure $ goEnv env0 t0
 
@@ -73,7 +73,7 @@ rowConsValue vts = \case
 recordProjValue :: Name -> Value -> Value
 recordProjValue label = \case
   V.Neut x spine -> V.Neut x $ V.RecordProj label spine
-  V.RecordCon vts -> vts ^. at label ?: error "bug"
+  V.RecordLit vts -> vts ^. at label ?: error "bug"
   _ -> error "bug"
 
 appSpine :: Eff MetaLookup m => Value -> Spine -> m Value
@@ -116,7 +116,7 @@ quote !lvl = go
       V.RowType labels va -> RowType labels <$> go va
       V.RowLit ts -> RowLit <$> traverse go ts
       V.RecordType vr -> RecordType <$> go vr
-      V.RecordCon vts -> RecordCon <$> traverse go vts
+      V.RecordLit vts -> RecordLit <$> traverse go vts
 
 openClosure :: Eff MetaLookup m => Level -> Closure -> m Value
 openClosure lvl closure = appClosure closure (V.var lvl)

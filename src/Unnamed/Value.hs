@@ -28,7 +28,7 @@ data Value
   | RowType LabelSet Value
   | RowLit (HashMap Name Value)
   | RecordType Value
-  | RecordCon (HashMap Name Value)
+  | RecordLit (HashMap Name Value)
   deriving stock (Show)
 
 data Var

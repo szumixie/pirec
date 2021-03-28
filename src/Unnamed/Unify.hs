@@ -80,7 +80,7 @@ rename meta = goRenaming
         V.RowType labels va -> RowType labels <$> go va
         V.RowLit vts -> RowLit <$> traverse go vts
         V.RecordType vr -> RecordType <$> go vr
-        V.RecordCon vts -> RecordCon <$> traverse go vts
+        V.RecordLit vts -> RecordLit <$> traverse go vts
 
 solve ::
   Effs [MetaCtx, Throw UnifyError] m => Level -> Meta -> Spine -> Value -> m ()
@@ -164,11 +164,11 @@ unify lvl = go
           | Map.keysSet vts == Map.keysSet vts' ->
             sequenceA_ (Map.intersectionWith go vts vts')
         (V.RecordType va, V.RecordType va') -> go va va'
-        (V.RecordCon vts, V.RecordCon vts')
+        (V.RecordLit vts, V.RecordLit vts')
           | Map.keysSet vts == Map.keysSet vts' ->
             sequenceA_ $ Map.intersectionWith go vts vts'
-        (V.RecordCon vts, V.Neut x spine) ->
+        (V.RecordLit vts, V.Neut x spine) ->
           ifor_ vts \label vt -> go vt (V.Neut x $ V.RecordProj label spine)
-        (V.Neut x spine, V.RecordCon vts) ->
+        (V.Neut x spine, V.RecordLit vts) ->
           ifor_ vts \label vt -> go (V.Neut x $ V.RecordProj label spine) vt
         (vt, vt') -> throw $ Mismatch vt vt'

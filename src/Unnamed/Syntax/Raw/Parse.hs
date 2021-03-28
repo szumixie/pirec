@@ -129,10 +129,10 @@ termRecordType = R.RecordType <$ record
 
 termRecordCon :: Parser R.Term
 termRecordCon =
-  braces $ R.RecordCon <$> ((,) <$> ident <* equals <*> term) `sepEndBy1` comma
+  braces $ R.RecordLit <$> ((,) <$> ident <* equals <*> term) `sepEndBy1` comma
 
 termEmptyRecordCon :: Parser R.Term
-termEmptyRecordCon = R.RecordCon [] <$ braces equals
+termEmptyRecordCon = R.RecordLit [] <$ braces equals
 
 termRecordProj :: Parser (R.Term -> R.Term)
 termRecordProj = R.RecordProj <$ dot <*> ident
