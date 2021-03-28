@@ -29,7 +29,8 @@ atoms =
   [ termVar
   , termHole
   , termU
-  , try termRowCon
+  , try termRowLit
+  , try termRowCons
   , try termEmptyRecordCon
   , termRecordCon
   ]
@@ -111,11 +112,17 @@ termApp :: Parser (R.Term -> R.Term -> R.Term)
 termApp = pure R.App
 
 termRowType :: Parser (R.Term -> R.Term)
-termRowType = R.RowType <$ row
+termRowType = R.RowType <$ row <* diff <*> braces (many ident)
 
-termRowCon :: Parser R.Term
-termRowCon =
-  braces $ R.RowCon <$> ((,) <$> ident <* colon <*> term) `sepEndBy` comma
+termRowLit :: Parser R.Term
+termRowLit =
+  braces $ R.RowLit <$> ((,) <$> ident <* colon <*> term) `sepEndBy` comma
+
+termRowCons :: Parser R.Term
+termRowCons =
+  braces $
+    R.RowCons <$> ((,) <$> ident <* colon <*> term) `sepEndBy` comma <* pipe
+      <*> term
 
 termRecordType :: Parser (R.Term -> R.Term)
 termRecordType = R.RecordType <$ record

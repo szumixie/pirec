@@ -20,7 +20,7 @@ data UnifyError
   | OccursError Meta
   | Nonlinear Level
   | Nonvariable Value
-  | ProjError
+  | NonInvertable
   deriving stock (Show)
 
 prettyUnifyError :: Eff MetaLookup m => Context -> UnifyError -> m (Doc ann)
@@ -41,4 +41,4 @@ prettyUnifyError ctx = \case
   Nonvariable vt -> do
     pt <- prettyValue ctx vt
     pure $ "got nonvariable in the context:" <> line <> pt
-  ProjError -> pure "cannot invert record projection"
+  NonInvertable -> pure "got non-invertable spine"

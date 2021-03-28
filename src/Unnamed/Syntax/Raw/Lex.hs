@@ -15,7 +15,9 @@ module Unnamed.Syntax.Raw.Lex (
   colon,
   lambda,
   dot,
+  diff,
   comma,
+  pipe,
   let_,
   in_,
   univ,
@@ -72,7 +74,17 @@ parens = between (symbol "(") (symbol ")")
 braces :: Parser a -> Parser a
 braces = between (symbol "{") (symbol "}")
 
-uscore, equals, semicolon, arrow, colon, lambda, dot, comma :: Parser Text
+uscore
+  , equals
+  , semicolon
+  , arrow
+  , colon
+  , lambda
+  , dot
+  , diff
+  , comma
+  , pipe ::
+    Parser Text
 uscore = symbol "_"
 equals = symbol "="
 semicolon = symbol ";"
@@ -80,7 +92,9 @@ arrow = symbol "->"
 colon = symbol ":"
 lambda = symbol "\\"
 dot = symbol "."
+diff = symbol "\\"
 comma = symbol ","
+pipe = symbol "|"
 
 let_, in_, univ, row, record :: Parser Text
 let_ = keyword "let"

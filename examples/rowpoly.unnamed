@@ -1,0 +1,6 @@
+let Nat  : _ = (N : U) -> (N -> N) -> N -> N
+  ; five : Nat = \N s z. s (s (s (s (s z))))
+  ; add  : Nat -> Nat -> Nat = \a b N s z. a N s (b N s z)
+  ; addrec : (R : Row \ {x y} U) -> Record { x : _, y : _ | R } -> Nat
+           = \R r. add r.x r.y
+ in addrec _ { x = five, y = five, z = five }

@@ -18,6 +18,7 @@ import Prettyprinter
 import Unnamed.BoundMask qualified as BM
 import Unnamed.Env (Env)
 import Unnamed.Env qualified as Env
+import Unnamed.LabelSet qualified as LS
 import Unnamed.Syntax.Core (Term (..))
 import Unnamed.Var.Name (Name (..))
 
@@ -69,15 +70,26 @@ prettyTermWith ctx@(Context env names) = go
         backslash <> pretty x <> dot
           <+> prettyTermWith (ctx & extendCtx x) 0 t
     App t u -> parensIf (prec > 10) $ go 10 t <+> go 11 u
-    RowType a -> parensIf (prec > 10) $ "Row" <+> go 11 a
-    RowCon ts ->
+    RowType (LS.Has _) a -> parensIf (prec > 10) $ "Row" <+> go 11 a
+    RowType (LS.Lacks labels) a ->
+      parensIf (prec > 10) $
+        "Row" <+> backslash <+> braces (hsep (pretty <$> toList labels))
+          <+> go 11 a
+    RowLit ts ->
       align . encloseSep "{ " " }" ", " $
         itoList ts <&> \(x, t) -> pretty x <+> colon <+> go 0 t
+    RowCons ts r ->
+      align
+        ( encloseSep "{ " " | " ", " $
+            itoList ts <&> \(x, t) -> pretty x <+> colon <+> go 0 t
+        )
+        <> go 0 r
+        <> " }"
     RecordType r -> parensIf (prec > 10) $ "Record" <+> go 11 r
     RecordCon ts ->
       align . encloseSep "{ " " }" ", " $
         itoList ts <&> \(x, t) -> pretty x <+> colon <+> go 0 t
-    RecordProj f t -> go 21 t <> dot <> pretty f
+    RecordProj label t -> go 21 t <> dot <> pretty label
 
 freshName :: HashSet Name -> Name -> Name
 freshName names name@(Name ts)

@@ -44,8 +44,9 @@ eval env0 t0 = do
           Pi x a b -> V.Pi x (go a) $ V.Closure env b
           Lam x t -> V.Lam x $ V.Closure env t
           App t u -> appValuePure mget (go t) (go u)
-          RowType a -> V.RowType $ go a
-          RowCon ts -> V.RowCon $ go <$> ts
+          RowType labels a -> V.RowType labels $ go a
+          RowLit ts -> V.RowLit $ go <$> ts
+          RowCons ts r -> rowConsValue (go <$> ts) (go r)
           RecordType r -> V.RecordType $ go r
           RecordCon ts -> V.RecordCon $ go <$> ts
           RecordProj label t -> recordProjValue label $ go t
@@ -63,6 +64,12 @@ appValue vt vu = case vt of
 appValuePure :: (Meta -> Maybe Value) -> Value -> Value -> Value
 appValuePure mget vt vu = run $ runMetaLookup mget $ appValue vt vu
 
+rowConsValue :: HashMap Name Value -> Value -> Value
+rowConsValue vts = \case
+  V.Neut x spine -> V.Neut x $ V.rowCons vts spine
+  V.RowLit vus -> V.RowLit $ vts <> vus
+  _ -> error "bug"
+
 recordProjValue :: Name -> Value -> Value
 recordProjValue label = \case
   V.Neut x spine -> V.Neut x $ V.RecordProj label spine
@@ -75,7 +82,8 @@ appSpine vt = go
   go = \case
     V.Nil -> pure vt
     V.App spine vu -> go spine >>= \vt' -> appValue vt' vu
-    V.RecordProj label spine -> go spine <&> \vt' -> recordProjValue label vt'
+    V.RowCons vts spine -> rowConsValue vts <$> go spine
+    V.RecordProj label spine -> recordProjValue label <$> go spine
 
 forceValue :: Eff MetaLookup m => Value -> m Value
 forceValue vt0 = case vt0 of
@@ -96,6 +104,8 @@ quote !lvl = go
                 V.Rigid lx -> Var lx
                 V.Flex mx -> Meta mx Nothing
               V.App spine vt -> App <$> goSpine spine <*> go vt
+              V.RowCons vts spine ->
+                RowCons <$> traverse go vts <*> goSpine spine
               V.RecordProj label spine -> RecordProj label <$> goSpine spine
          in goSpine spine0
       V.U -> pure U
@@ -103,8 +113,8 @@ quote !lvl = go
         Pi x <$> go va <*> (quote (lvl + 1) =<< openClosure lvl closure)
       V.Lam x closure ->
         Lam x <$> (quote (lvl + 1) =<< openClosure lvl closure)
-      V.RowType va -> RowType <$> go va
-      V.RowCon vts -> RowCon <$> traverse go vts
+      V.RowType labels va -> RowType labels <$> go va
+      V.RowLit ts -> RowLit <$> traverse go ts
       V.RecordType vr -> RecordType <$> go vr
       V.RecordCon vts -> RecordCon <$> traverse go vts
 

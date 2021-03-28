@@ -26,6 +26,7 @@ data ElabErrorType
   = UnifyError Value Value UnifyError
   | ScopeError {-# UNPACK #-} Name
   | DupField {-# UNPACK #-} Name
+  | FieldOverlap (HashSet Name)
   | FieldMismatch (HashSet Name) (HashSet Name)
   | FieldExpected {-# UNPACK #-} Name Value
   deriving stock (Show)
@@ -72,6 +73,10 @@ instance ShowErrorComponent CompElabError where
               ]
         ScopeError x -> pure $ "variable" <+> pretty x <+> "out of scope"
         DupField label -> pure $ "duplicate field" <+> pretty label <+> "in row"
+        FieldOverlap labels ->
+          pure $
+            "the following fields inferred to overlap:" <> line
+              <> pretty (toList labels)
         FieldMismatch tset aset ->
           pure $
             vsep

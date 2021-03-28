@@ -2,10 +2,14 @@ module Unnamed.Elab (check, infer) where
 
 import Relude
 
+import Data.HashMap.Lazy qualified as Map
+import Data.HashSet qualified as Set
+
 import Control.Effect
 import Control.Effect.Error
 import Optics
 
+import Unnamed.LabelSet qualified as LS
 import Unnamed.Syntax.Core (Term (..))
 import Unnamed.Syntax.Raw qualified as R
 import Unnamed.Value (Value)
@@ -94,35 +98,61 @@ checkInfer ctx = (goCheck, goInfer)
             va <- eval (ctx ^. #env) =<< insertMeta ctx
             closure <-
               V.Closure (ctx ^. #env) <$> insertMeta (ctx & Ctx.bind "x" va)
-            (va, closure) <$ elabUnify ctx vp (V.Pi "x" va closure)
+            elabUnify ctx vp $ V.Pi "x" va closure
+            pure (va, closure)
       u <- goCheck ru va
       vu <- eval (ctx ^. #env) u
       vb <- appClosure closure vu
       pure (App t u, vb)
-    R.RowType ra -> do
+    R.RowType labels ra -> do
       a <- goCheck ra V.U
-      pure (RowType a, V.U)
-    R.RowCon [] -> do
+      ulabels <- labelsUnique ctx $ (,()) <$> labels
+      pure (RowType (LS.Lacks $ Set.fromMap ulabels) a, V.U)
+    R.RowLit [] -> do
       va <- eval (ctx ^. #env) =<< insertMeta ctx
-      pure (RowCon mempty, V.RowType va)
-    R.RowCon ((x1, rt1) : rts) -> do
+      pure (RowLit mempty, V.RowType mempty va)
+    R.RowLit ((label1, rt1) : rts) -> do
       (t1, va) <- goInfer rt1
-      rts' <- labelsUnique ctx ((x1, rt1) : rts)
-      ts <- ifor rts' \x t -> if x == x1 then pure t1 else goCheck t va
-      pure (RowCon ts, V.RowType va)
+      rts' <- labelsUnique ctx ((label1, rt1) : rts)
+      ts <- ifor rts' \label rt ->
+        if label == label1 then pure t1 else goCheck rt va
+      pure (RowLit ts, V.RowType (LS.Has $ Map.keysSet ts) va)
+    R.RowCons rts rr -> do
+      (r, vrt0) <- goInfer rr
+      rts' <- labelsUnique ctx rts
+      let labelSet = Map.keysSet rts'
+      forceValue vrt0 >>= \case
+        V.RowType labels va -> do
+          unless (LS.disjoint (LS.Has labelSet) labels) $
+            case LS.intersection (LS.Has labelSet) labels of
+              LS.Has ilabels -> throw $ ElabError ctx (FieldOverlap ilabels)
+              LS.Lacks _ -> error "bug"
+          ts <- traverse (`goCheck` va) rts'
+          pure (RowCons ts r, V.RowType (LS.Has labelSet <> labels) va)
+        vrt -> do
+          va <- eval (ctx ^. #env) =<< insertMeta ctx
+          elabUnify ctx vrt $ V.RowType (LS.Lacks labelSet) va
+          ts <- traverse (`goCheck` va) rts'
+          pure (RowCons ts r, V.RowType LS.full va)
     R.RecordType rr -> do
-      r <- goCheck rr $ V.RowType V.U
+      r <- goCheck rr $ V.RowType LS.full V.U
       pure (RecordType r, V.U)
     R.RecordCon rts -> do
       rts' <- labelsUnique ctx rts
       tvas <- traverse goInfer rts'
-      pure (RecordCon $ fst <$> tvas, V.RecordType $ V.RowCon $ snd <$> tvas)
+      pure (RecordCon $ fst <$> tvas, V.RecordType $ V.RowLit (snd <$> tvas))
     R.RecordProj label rt -> do
       (t, vr0) <- goInfer rt
       forceValue vr0 >>= \case
-        V.RecordType (V.RowCon as)
+        V.RecordType (V.RowLit as)
           | Just a <- as ^. at label -> pure (RecordProj label t, a)
-        vr -> throw $ ElabError ctx (FieldExpected label vr)
+        vr -> do
+          a <- insertMeta ctx
+          va <- eval (ctx ^. #env) a
+          row <- insertMeta ctx
+          elabUnify ctx vr
+            =<< eval (ctx ^. #env) (RecordType (RowCons (one (label, a)) row))
+          pure (RecordProj label t, va)
 
 labelsUnique ::
   Eff (Throw ElabError) m => Context -> [(Name, a)] -> m (HashMap Name a)

@@ -3,6 +3,7 @@ module Unnamed.Syntax.Core (Term (..)) where
 import Relude
 
 import Unnamed.BoundMask (BoundMask)
+import Unnamed.LabelSet (LabelSet)
 import Unnamed.Var.Level (Level)
 import Unnamed.Var.Meta (Meta)
 import Unnamed.Var.Name (Name)
@@ -15,8 +16,9 @@ data Term
   | Pi {-# UNPACK #-} Name Term Term
   | Lam {-# UNPACK #-} Name Term
   | App Term Term
-  | RowType Term
-  | RowCon (HashMap Name Term)
+  | RowType LabelSet Term
+  | RowLit (HashMap Name Term)
+  | RowCons (HashMap Name Term) Term
   | RecordType Term
   | RecordCon (HashMap Name Term)
   | RecordProj {-# UNPACK #-} Name Term

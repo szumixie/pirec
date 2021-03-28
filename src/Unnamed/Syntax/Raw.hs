@@ -14,8 +14,9 @@ data Term
   | Pi {-# UNPACK #-} Name Term Term
   | Lam {-# UNPACK #-} Name Term
   | App Term Term
-  | RowType Term
-  | RowCon [(Name, Term)]
+  | RowType [Name] Term
+  | RowLit [(Name, Term)]
+  | RowCons [(Name, Term)] Term
   | RecordType Term
   | RecordCon [(Name, Term)]
   | RecordProj {-# UNPACK #-} Name Term
