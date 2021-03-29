@@ -27,23 +27,23 @@ import Unnamed.Effect.Meta
 
 eval :: Eff MetaLookup m => Env Value -> Term -> m Value
 eval env0 t0 = do
-  mget <- metaLookup
+  mlookup <- metaLookup
   let goEnv !env = go
        where
         go = \case
           Var lx -> env & Env.index lx ?: error "bug"
-          Meta mx Nothing -> mget mx ?: V.meta mx
+          Meta mx Nothing -> mlookup mx ?: V.meta mx
           Meta mx (Just mask) ->
             env
               & foldlOf'
                 (BM.masked mask)
-                (appValuePure mget)
-                (mget mx ?: V.meta mx)
+                (appValuePure mlookup)
+                (mlookup mx ?: V.meta mx)
           Let _ _ t u -> goEnv (env & Env.extend (go t)) u
           U -> V.U
           Pi x a b -> V.Pi x (go a) $ V.Closure env b
           Lam x t -> V.Lam x $ V.Closure env t
-          App t u -> appValuePure mget (go t) (go u)
+          App t u -> appValuePure mlookup (go t) (go u)
           RowType labels a -> V.RowType labels $ go a
           RowLit ts -> V.RowLit $ go <$> ts
           RowCons ts r -> rowConsValue (go <$> ts) (go r)
@@ -62,7 +62,7 @@ appValue vt vu = case vt of
   _ -> error "bug"
 
 appValuePure :: (Meta -> Maybe Value) -> Value -> Value -> Value
-appValuePure mget vt vu = run $ runMetaLookup mget $ appValue vt vu
+appValuePure mlookup vt vu = run $ runMetaLookup mlookup $ appValue vt vu
 
 rowConsValue :: HashMap Name Value -> Value -> Value
 rowConsValue vts = \case

@@ -44,8 +44,8 @@ type MetaCtx = Bundle [MetaLookup, MetaState]
 
 runMetaLookup ::
   Carrier m => (Meta -> Maybe Value) -> InterpreterFor MetaLookup m
-runMetaLookup mget = interpret \case
-  MetaLookup -> pure mget
+runMetaLookup mlookup = interpret \case
+  MetaLookup -> pure mlookup
 
 type MetaLookupC s = InterpretC (ViaReifiedH s) MetaLookup
 type MetaStateC s = InterpretC (ViaReifiedH s) MetaState

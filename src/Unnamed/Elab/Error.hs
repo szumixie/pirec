@@ -55,9 +55,9 @@ instance Ord CompElabError where
   compare _ _ = EQ
 
 instance ShowErrorComponent CompElabError where
-  showErrorComponent (CompElabError mget (ElabError ctx err)) =
+  showErrorComponent (CompElabError mlookup (ElabError ctx err)) =
     renderString . layoutPretty defaultLayoutOptions . run $ runMetaLookup
-      mget
+      mlookup
       case err of
         UnifyError va va' uerr -> do
           puerr <- prettyUnifyError ctx uerr
@@ -94,12 +94,12 @@ instance ShowErrorComponent CompElabError where
 
 prettyElabError :: Eff MetaLookup m => ElabError -> FilePath -> Text -> m String
 prettyElabError err fp input = do
-  mget <- metaLookup
+  mlookup <- metaLookup
   pure . errorBundlePretty $
     ParseErrorBundle
       ( one $
           FancyError
             (err ^. #context % #span % #start)
-            (one $ ErrorCustom (CompElabError mget err))
+            (one $ ErrorCustom (CompElabError mlookup err))
       )
       (PosState input 0 (initialPos fp) defaultTabWidth "")
