@@ -16,7 +16,8 @@ ghc-options:
   - -Wredundant-constraints
   - -Wpartial-fields
   - -Wmissing-deriving-strategies
-  
+  - -Wprepositive-qualified-module
+
   - -fplugin=Control.Effect.Plugin
 
 default-extensions:
@@ -109,6 +110,10 @@ dependencies:
   - prettyprinter
   - megaparsec
 
+_no-paths: &no-paths
+  condition: false
+  other-modules: Paths_unnamed
+
 _exe-options: &exe-options
   main: Main.hs
   ghc-options:
@@ -121,37 +126,46 @@ _exe-options: &exe-options
 library:
   source-dirs: src
   when:
-    - condition: false
-      other-modules: Paths_unnamed
+    - *no-paths
+    - condition: flag(release)
+      ghc-options:
+        - -Wunused-packages
 
 executables:
   unnamed:
     source-dirs: app
     <<: *exe-options
+    when:
+      - *no-paths
 
 tests:
   test-unnamed:
     source-dirs: test
     <<: *exe-options
     when:
-      condition: true
-      dependencies:
-        - hspec
-        - hspec-discover
-        - hspec-hedgehog
-        - hedgehog
+      - *no-paths
+      - condition: true
+        dependencies:
+          - hspec
+          - hspec-discover
+          - hspec-hedgehog
+          - hedgehog
 
 benchmarks:
   bench-unnamed:
     source-dirs: benchmark
     <<: *exe-options
     when:
-      condition: true
-      dependencies:
-        - criterion
+      - *no-paths
+      - condition: true
+        dependencies:
+          - criterion
 
 flags:
   release:
+    manual: true
+    default: false
+  dump:
     manual: true
     default: false
 
@@ -162,3 +176,14 @@ when:
   - condition: "!flag(release)"
     dependencies:
       - pretty-simple
+  - condition: flag(dump)
+    ghc-options:
+      - -ddump-to-file
+      - -dumpdir=.dumps
+      - -ddump-simpl
+      - -dppr-case-as-let
+      - -dsuppress-uniques
+      - -dsuppress-idinfo
+      - -dsuppress-module-prefixes
+      - -dsuppress-type-applications
+      - -dsuppress-coercions
