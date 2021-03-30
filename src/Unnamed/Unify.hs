@@ -159,7 +159,7 @@ unify lvl = go
           vt <- openClosure lvl closure
           unify (lvl + 1) (V.Neut x $ V.App spine (V.var lvl)) vt
         (V.RowType labels va, V.RowType labels' va')
-          | labels `LS.isSubsetOf` labels' -> go va va'
+          | labels' `LS.isSubsetOf` labels -> go va va'
         (V.RowLit vts, V.RowLit vts')
           | Map.keysSet vts == Map.keysSet vts' ->
             sequenceA_ (Map.intersectionWith go vts vts')

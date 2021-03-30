@@ -41,8 +41,8 @@ isSubsetOf = curry \case
 disjoint :: LabelSet -> LabelSet -> Bool
 disjoint = curry \case
   (Has xs, Has ys) -> disjointHashSet xs ys
-  (Has xs, Lacks ys) -> ys `Set.isSubsetOf` xs
-  (Lacks xs, Has ys) -> xs `Set.isSubsetOf` ys
+  (Has xs, Lacks ys) -> xs `Set.isSubsetOf` ys
+  (Lacks xs, Has ys) -> ys `Set.isSubsetOf` xs
   (Lacks _, Lacks _) -> False
 
 full :: LabelSet
