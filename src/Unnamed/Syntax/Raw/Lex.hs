@@ -27,12 +27,12 @@ module Unnamed.Syntax.Raw.Lex (
 
 import Relude hiding (many, some)
 
-import Data.Char (isLetter)
+import Data.Char (isAlphaNum)
 import Data.HashSet qualified as Set
 import Data.List.NonEmpty qualified as NE
 
 import Text.Megaparsec
-import Text.Megaparsec.Char (letterChar, space1)
+import Text.Megaparsec.Char (alphaNumChar, space1)
 import Text.Megaparsec.Char.Lexer qualified as L
 
 import Unnamed.Var.Name (Name, name)
@@ -53,7 +53,7 @@ symbol :: Text -> Parser Text
 symbol = lexeme . chunk
 
 keyword :: Text -> Parser Text
-keyword kw = lexeme $ chunk kw <* notFollowedBy letterChar
+keyword kw = lexeme $ chunk kw <* notFollowedBy alphaNumChar
 
 keywords :: HashSet Text
 keywords = Set.fromList ["let", "in", "U", "Row", "Record"]
@@ -61,7 +61,7 @@ keywords = Set.fromList ["let", "in", "U", "Row", "Record"]
 ident :: Parser Name
 ident = lexeme $ try do
   offset <- getOffset
-  text <- takeWhile1P (Just "identifier") isLetter
+  text <- takeWhile1P (Just "identifier") isAlphaNum
   if text `Set.member` keywords
     then
       region (setErrorOffset offset) . label "identifier" $
