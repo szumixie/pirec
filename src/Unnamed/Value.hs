@@ -5,7 +5,6 @@ module Unnamed.Value (
   Spine (..),
   var,
   meta,
-  rowCons,
 ) where
 
 import Relude
@@ -41,6 +40,7 @@ data Spine
   | App Spine ~Value
   | RowCons (HashMap Name Value) Spine
   | RecordProj {-# UNPACK #-} Name Spine
+  | RecordMod {-# UNPACK #-} Name ~Value Spine
   deriving stock (Show)
 
 var :: Level -> Value
@@ -48,8 +48,3 @@ var lx = Neut (Rigid lx) Nil
 
 meta :: Meta -> Value
 meta mx = Neut (Flex mx) Nil
-
-rowCons :: HashMap Name Value -> Spine -> Spine
-rowCons vts = \case
-  RowCons vus spine -> RowCons (vts <> vus) spine
-  spine -> RowCons vts spine

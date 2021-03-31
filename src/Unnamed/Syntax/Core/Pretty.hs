@@ -73,7 +73,7 @@ prettyTermWith ctx@(Context env names) = go
     RowType (LS.Has _) a -> parensIf (prec > 10) $ "Row" <+> go 11 a
     RowType (LS.Lacks labels) a ->
       parensIf (prec > 10) $
-        "Row" <+> backslash <+> braces (hsep (pretty <$> toList labels))
+        "Row" <> backslash <> braces (hsep (pretty <$> toList labels))
           <+> go 11 a
     RowLit ts ->
       align . encloseSep "{ " " }" ", " $
@@ -90,6 +90,8 @@ prettyTermWith ctx@(Context env names) = go
       align . encloseSep "{ " " }" ", " $
         itoList ts <&> \(x, t) -> pretty x <+> colon <+> go 0 t
     RecordProj label t -> go 21 t <> dot <> pretty label
+    RecordMod label u t ->
+      go 21 t <> dot <> braces (pretty label <+> equals <+> go 0 u)
 
 freshName :: HashSet Name -> Name -> Name
 freshName names name@(Name ts)

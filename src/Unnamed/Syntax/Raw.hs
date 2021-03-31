@@ -20,4 +20,5 @@ data Term
   | RecordType Term
   | RecordLit [(Name, Term)]
   | RecordProj {-# UNPACK #-} Name Term
+  | RecordMod {-# UNPACK #-} Name Term Term
   deriving stock (Show)

@@ -65,10 +65,14 @@ rename meta = goRenaming
                   V.Flex mx
                     | mx == meta -> throw $ OccursError meta
                     | otherwise -> pure $ Meta mx Nothing
-                V.App spine vt -> App <$> goSpine spine <*> go vt
+                V.App spine vt ->
+                  App <$> goSpine spine <*> go vt
                 V.RowCons vts spine ->
                   RowCons <$> traverse go vts <*> goSpine spine
-                V.RecordProj label spine -> RecordProj label <$> goSpine spine
+                V.RecordProj label spine ->
+                  RecordProj label <$> goSpine spine
+                V.RecordMod label vu spine ->
+                  RecordMod label <$> go vu <*> goSpine spine
            in goSpine spine0
         V.U -> pure U
         V.Pi x va closure ->
@@ -110,6 +114,8 @@ unify lvl = go
                       goSpine spine spine'
                   (V.RecordProj label spine, V.RecordProj label' spine')
                     | label == label' -> goSpine spine spine'
+                  (V.RecordMod label vu spine, V.RecordMod label' vu' spine')
+                    | label == label' -> go vu vu' *> goSpine spine spine'
                   (spine, spine') ->
                     throw $ Mismatch (V.Neut x spine) (V.Neut x' spine')
              in goSpine spine0 spine0'

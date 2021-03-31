@@ -1,6 +1,7 @@
 module Unnamed.Eval (
   eval,
   appClosure,
+  rowConsValue,
   forceValue,
   quote,
   openClosure,
@@ -50,6 +51,7 @@ eval env0 t0 = do
           RecordType r -> V.RecordType $ go r
           RecordLit ts -> V.RecordLit $ go <$> ts
           RecordProj label t -> recordProjValue label $ go t
+          RecordMod label u t -> recordModValue label (go u) (go t)
   pure $ goEnv env0 t0
 
 appClosure :: Eff MetaLookup m => Closure -> Value -> m Value
@@ -66,14 +68,35 @@ appValuePure mlookup vt vu = run $ runMetaLookup mlookup $ appValue vt vu
 
 rowConsValue :: HashMap Name Value -> Value -> Value
 rowConsValue vts = \case
-  V.Neut x spine -> V.Neut x $ V.rowCons vts spine
+  V.Neut x spine0 ->
+    let go !vts1 = \case
+          V.RowCons vus spine -> go (vts1 <> vus) spine
+          spine -> V.Neut x $ V.RowCons vts1 spine
+     in go vts spine0
   V.RowLit vus -> V.RowLit $ vts <> vus
   _ -> error "bug"
 
 recordProjValue :: Name -> Value -> Value
 recordProjValue label = \case
-  V.Neut x spine -> V.Neut x $ V.RecordProj label spine
+  V.Neut x spine0 ->
+    let go = \case
+          V.RecordMod label' vu spine
+            | label == label' -> vu
+            | otherwise -> go spine
+          spine -> V.Neut x $ V.RecordProj label spine
+     in go spine0
   V.RecordLit vts -> vts ^. at label ?: error "bug"
+  _ -> error "bug"
+
+recordModValue :: Name -> Value -> Value -> Value
+recordModValue label vu = \case
+  V.Neut x spine0 ->
+    let go = \case
+          V.RecordMod label' _ spine
+            | label == label' -> go spine
+          spine -> V.Neut x $ V.RecordMod label vu spine
+     in go spine0
+  V.RecordLit vts -> V.RecordLit $ vts & at label ?~ vu
   _ -> error "bug"
 
 appSpine :: Eff MetaLookup m => Value -> Spine -> m Value
@@ -84,6 +107,7 @@ appSpine vt = go
     V.App spine vu -> go spine >>= \vt' -> appValue vt' vu
     V.RowCons vts spine -> rowConsValue vts <$> go spine
     V.RecordProj label spine -> recordProjValue label <$> go spine
+    V.RecordMod label vu spine -> recordModValue label vu <$> go spine
 
 forceValue :: Eff MetaLookup m => Value -> m Value
 forceValue vt0 = case vt0 of
@@ -103,10 +127,14 @@ quote !lvl = go
               V.Nil -> pure case x of
                 V.Rigid lx -> Var lx
                 V.Flex mx -> Meta mx Nothing
-              V.App spine vt -> App <$> goSpine spine <*> go vt
+              V.App spine vt ->
+                App <$> goSpine spine <*> go vt
               V.RowCons vts spine ->
                 RowCons <$> traverse go vts <*> goSpine spine
-              V.RecordProj label spine -> RecordProj label <$> goSpine spine
+              V.RecordProj label spine ->
+                RecordProj label <$> goSpine spine
+              V.RecordMod label vt spine ->
+                RecordMod label <$> go vt <*> goSpine spine
          in goSpine spine0
       V.U -> pure U
       V.Pi x va closure ->

@@ -37,7 +37,7 @@ atoms =
 
 ops :: [Level]
 ops =
-  [ LeftAssoc [] [] [termRecordProj]
+  [ LeftAssoc [] [] [try termRecordProj, termRecordMod]
   , LeftAssoc [termApp] [termRowType, termRecordType] []
   , RightAssoc [termFun] [termLet, try termPi, termLam] []
   ]
@@ -121,7 +121,7 @@ termRowLit =
 termRowCons :: Parser R.Term
 termRowCons =
   braces $
-    R.RowCons <$> ((,) <$> ident <* colon <*> term) `sepEndBy` comma <* pipe
+    R.RowCons <$> ((,) <$> ident <* colon <*> term) `sepEndBy1` comma <* pipe
       <*> term
 
 termRecordType :: Parser (R.Term -> R.Term)
@@ -136,3 +136,7 @@ termEmptyRecordCon = R.RecordLit [] <$ braces equals
 
 termRecordProj :: Parser (R.Term -> R.Term)
 termRecordProj = R.RecordProj <$ dot <*> ident
+
+termRecordMod :: Parser (R.Term -> R.Term)
+termRecordMod =
+  uncurry R.RecordMod <$ dot <*> braces ((,) <$> ident <* equals <*> term)

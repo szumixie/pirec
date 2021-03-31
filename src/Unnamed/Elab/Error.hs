@@ -76,14 +76,14 @@ instance ShowErrorComponent CompElabError where
         FieldOverlap labels ->
           pure $
             "the following fields inferred to overlap:" <> line
-              <> pretty (toList labels)
+              <> hsep (pretty <$> toList labels)
         FieldMismatch tset aset ->
           pure $
             vsep
               [ "expected record with fields:"
-              , pretty $ toList aset
+              , hsep $ pretty <$> toList aset
               , "but got record with fields:"
-              , pretty $ toList tset
+              , hsep $ pretty <$> toList tset
               ]
         FieldExpected label va -> do
           pa <- prettyValue ctx va

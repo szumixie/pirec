@@ -28,6 +28,9 @@ insertMeta ctx = do
   meta <- freshMeta
   pure $ Meta meta (Just $ ctx ^. #boundMask)
 
+insertMetaValue :: Eff MetaCtx m => Context -> m Value
+insertMetaValue ctx = eval (ctx ^. #env) =<< insertMeta ctx
+
 elabUnify ::
   Effs [MetaCtx, Throw ElabError] m => Context -> Value -> Value -> m ()
 elabUnify ctx vt vt' =
@@ -70,7 +73,7 @@ checkInfer ctx = (goCheck, goInfer)
     R.Var x -> case ctx ^. #names % at x of
       Nothing -> throw $ ElabError ctx (ScopeError x)
       Just (lx, va) -> pure (Var lx, va)
-    R.Hole -> (,) <$> insertMeta ctx <*> (eval (ctx ^. #env) =<< insertMeta ctx)
+    R.Hole -> (,) <$> insertMeta ctx <*> insertMetaValue ctx
     R.Let x ra rt ru -> do
       a <- goCheck ra V.U
       va <- eval (ctx ^. #env) a
@@ -85,7 +88,7 @@ checkInfer ctx = (goCheck, goInfer)
       b <- check (ctx & Ctx.bind x va) rb V.U
       pure (Pi x a b, V.U)
     R.Lam x rt -> do
-      va <- eval (ctx ^. #env) =<< insertMeta ctx
+      va <- insertMetaValue ctx
       (t, vb) <- infer (ctx & Ctx.bind x va) rt
       closure <- closeValue (ctx ^. #env) vb
       pure (Lam x t, V.Pi x va closure)
@@ -95,7 +98,7 @@ checkInfer ctx = (goCheck, goInfer)
         forceValue vp0 >>= \case
           V.Pi _ va vb -> pure (va, vb)
           vp -> do
-            va <- eval (ctx ^. #env) =<< insertMeta ctx
+            va <- insertMetaValue ctx
             closure <-
               V.Closure (ctx ^. #env) <$> insertMeta (ctx & Ctx.bind "x" va)
             elabUnify ctx vp $ V.Pi "x" va closure
@@ -109,7 +112,7 @@ checkInfer ctx = (goCheck, goInfer)
       ulabels <- labelsUnique ctx $ (,()) <$> labels
       pure (RowType (LS.Lacks $ Set.fromMap ulabels) a, V.U)
     R.RowLit [] -> do
-      va <- eval (ctx ^. #env) =<< insertMeta ctx
+      va <- insertMetaValue ctx
       pure (RowLit mempty, V.RowType mempty va)
     R.RowLit ((label1, rt1) : rts) -> do
       (t1, va) <- goInfer rt1
@@ -130,7 +133,7 @@ checkInfer ctx = (goCheck, goInfer)
           ts <- traverse (`goCheck` va) rts'
           pure (RowCons ts r, V.RowType (LS.Has labelSet <> labels) va)
         vrt -> do
-          va <- eval (ctx ^. #env) =<< insertMeta ctx
+          va <- insertMetaValue ctx
           elabUnify ctx vrt $ V.RowType (LS.Lacks labelSet) va
           ts <- traverse (`goCheck` va) rts'
           pure (RowCons ts r, V.RowType LS.full va)
@@ -147,12 +150,27 @@ checkInfer ctx = (goCheck, goInfer)
         V.RecordType (V.RowLit as)
           | Just a <- as ^. at label -> pure (RecordProj label t, a)
         vr -> do
-          a <- insertMeta ctx
-          va <- eval (ctx ^. #env) a
-          row <- insertMeta ctx
-          elabUnify ctx vr
-            =<< eval (ctx ^. #env) (RecordType (RowCons (one (label, a)) row))
+          va <- insertMetaValue ctx
+          vr' <- insertMetaValue ctx
+          elabUnify ctx vr $ V.RecordType (rowConsValue (one (label, va)) vr')
           pure (RecordProj label t, va)
+    R.RecordMod label ru rt -> do
+      (t, vr0) <- goInfer rt
+      (u, vb) <- goInfer ru
+      forceValue vr0 >>= \case
+        V.RecordType (V.RowLit as) ->
+          pure
+            ( RecordMod label u t
+            , V.RecordType $ V.RowLit (as & at label ?~ vb)
+            )
+        vr -> do
+          va <- insertMetaValue ctx
+          vr' <- insertMetaValue ctx
+          elabUnify ctx vr $ V.RecordType (rowConsValue (one (label, va)) vr')
+          pure
+            ( RecordMod label u t
+            , V.RecordType $ rowConsValue (one (label, vb)) vr'
+            )
 
 labelsUnique ::
   Eff (Throw ElabError) m => Context -> [(Name, a)] -> m (HashMap Name a)
