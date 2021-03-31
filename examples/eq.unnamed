@@ -1,0 +1,15 @@
+let Eq : (A : U) -> A -> A -> U = \A x y. (P : A -> U) -> P x -> P y
+  ; refl : (A : U) (x : A) -> Eq _ x x = \A x P px. px
+  ; Nat = (A : _) -> Record { z : A, s : A -> A } -> A
+  ; 0 : Nat = \A r. r.z
+  ; 1 : Nat = \A r. r.s r.z
+  ; 2 : Nat = \A r. r.s (r.s r.z)
+  ; add : Nat -> Nat -> Nat = \x y A r. x _ r.{ z = y _ r }
+  ; mul : Nat -> Nat -> Nat = \x y A r. x _ r.{ s = \(a : A). y _ r.{ z = a } }
+  ; mul2 : Nat -> Nat -> Nat = \x y. y _ { z = 0, s = add x }
+  ; pow : Nat -> Nat -> Nat = \x y. y _ { z = 1, s = mul2 x }
+  ; 4 = add 2 2
+  ; 8 = mul 2 4
+  ; 16 = mul 4 4
+  ; p : Eq _ (mul 16 16) (pow 2 8) = refl _ _
+ in p

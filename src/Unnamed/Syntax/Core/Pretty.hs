@@ -20,6 +20,7 @@ import Unnamed.Env (Env)
 import Unnamed.Env qualified as Env
 import Unnamed.LabelSet qualified as LS
 import Unnamed.Syntax.Core (Term (..))
+import Unnamed.Var.Level (Level (..))
 import Unnamed.Var.Name (Name (..))
 
 data Context = Context (Env Name) (HashSet Name)
@@ -39,7 +40,7 @@ prettyTermWith :: Context -> Int -> Term -> Doc ann
 prettyTermWith ctx@(Context env names) = go
  where
   go !prec = \case
-    Var lx -> env & Env.index lx & fromMaybe (error "bug") & pretty
+    Var lx@(Level n) -> env & Env.index lx & maybe ("@" <> pretty n) pretty
     Meta mx Nothing -> pretty mx
     Meta mx (Just mask) ->
       parensIf (prec > 10) $

@@ -1,8 +1,8 @@
-let Nat  : _ = (N : _) -> (N -> N) -> N -> N
-  ; five : Nat = \N s z. s (s (s (s (s z))))
-  ; add  : Nat -> Nat -> Nat = \a b N s z. a _ s (b _ s z)
-  ; mul  : Nat -> Nat -> Nat = \a b N s z. a _ (b _ s) z
-  ; ten      : _ = add five five
-  ; hundred  : _ = mul ten ten
-  ; thousand : _ = mul ten hundred
- in thousand
+let Nat = (A : _) -> (A -> A) -> A -> A
+  ; add : Nat -> Nat -> Nat = \x y A s z. x _ s (y _ s z)
+  ; mul : Nat -> Nat -> Nat = \x y A s z. x _ (y _ s) z
+  ; 5 : Nat = \A s z. s (s (s (s (s z))))
+  ; 10 = add 5 5
+  ; 100 = mul 10 10
+  ; 1000 = mul 10 100
+ in 1000
