@@ -44,13 +44,11 @@ prettyTermWith ctx@(Context env names) = go
     Meta mx (Just mask) ->
       parensIf (prec > 10) $
         env & foldlOf' (BM.masked mask % to pretty) (<+>) (pretty mx)
-    Let (freshName names -> x) a t u ->
+    Let (freshName names -> x) t u ->
       parensIf (prec > 0) $
         hsep
           [ "let"
           , pretty x
-          , colon
-          , go 0 a
           , equals
           , go 0 t
           , "in"

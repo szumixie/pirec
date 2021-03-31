@@ -88,7 +88,7 @@ termHole = R.Hole <$ uscore
 termLet :: Parser (R.Term -> R.Term)
 termLet =
   foldr (.) id <$ let_
-    <*> (R.Let <$> ident <* colon <*> term <* equals <*> term)
+    <*> (R.Let <$> ident <*> optional (colon *> term) <* equals <*> term)
       `sepEndBy1` semicolon <* in_
 
 termU :: Parser R.Term
@@ -106,7 +106,13 @@ termFun :: Parser (R.Term -> R.Term -> R.Term)
 termFun = R.Pi "_" <$ arrow
 
 termLam :: Parser (R.Term -> R.Term)
-termLam = foldr (.) id <$ lambda <*> some (R.Lam <$> ident) <* dot
+termLam = foldr (.) id <$ lambda <*> some binder <* dot
+ where
+  binder =
+    choice
+      [ parens $ R.Lam <$> ident <* colon <*> (Just <$> term)
+      , (`R.Lam` Nothing) <$> ident
+      ]
 
 termApp :: Parser (R.Term -> R.Term -> R.Term)
 termApp = pure R.App

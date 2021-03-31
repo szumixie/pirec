@@ -1,6 +1,6 @@
 let Nat  : U = (A : U) -> Record { zero : A, suc : A -> A } -> A
   ; five : Nat = \A r. r.suc (r.suc (r.suc (r.suc (r.suc r.zero))))
   ; add  : Nat -> Nat -> Nat = \x y A r. x A r.{ zero = y A r }
-  ; addrec : (R : Row\{x y z} U) -> Record { x : Nat | R } -> Record { x : Nat | R }
+  ; addrec : (R : Row\{x} U) -> Record { x : Nat | R } -> Record { x : Nat | R }
            = \R r. r.{ x = add r.x five }
  in addrec _ { x = five, y = five }

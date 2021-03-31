@@ -9,10 +9,10 @@ data Term
   = Span {-# UNPACK #-} Span Term
   | Var {-# UNPACK #-} Name
   | Hole
-  | Let {-# UNPACK #-} Name Term Term Term
+  | Let {-# UNPACK #-} Name (Maybe Term) Term Term
   | U
   | Pi {-# UNPACK #-} Name Term Term
-  | Lam {-# UNPACK #-} Name Term
+  | Lam {-# UNPACK #-} Name (Maybe Term) Term
   | App Term Term
   | RowType [Name] Term
   | RowLit [(Name, Term)]

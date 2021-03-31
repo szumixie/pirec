@@ -40,7 +40,7 @@ eval env0 t0 = do
                 (BM.masked mask)
                 (appValuePure mlookup)
                 (mlookup mx ?: V.meta mx)
-          Let _ _ t u -> goEnv (env & Env.extend (go t)) u
+          Let _ t u -> goEnv (env & Env.extend (go t)) u
           U -> V.U
           Pi x a b -> V.Pi x (go a) $ V.Closure env b
           Lam x t -> V.Lam x $ V.Closure env t

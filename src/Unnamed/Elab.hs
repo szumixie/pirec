@@ -1,6 +1,7 @@
 module Unnamed.Elab (check, infer) where
 
 import Relude
+import Relude.Extra.Tuple (traverseToFst)
 
 import Data.HashMap.Lazy qualified as Map
 import Data.HashSet qualified as Set
@@ -54,18 +55,23 @@ checkInfer ctx = (goCheck, goInfer)
   goCheck = curry \case
     (R.Span span rt, va) -> check (ctx & #span .~ span) rt va
     (R.Hole, _) -> insertMeta ctx
-    (R.Let x ra rt ru, vb) -> do
-      a <- goCheck ra V.U
-      va <- eval (ctx ^. #env) a
-      t <- goCheck rt va
+    (R.Let x mra rt ru, vb) -> do
+      (t, va) <- case mra of
+        Nothing -> goInfer rt
+        Just ra -> do
+          va <- eval (ctx ^. #env) =<< goCheck ra V.U
+          traverseToFst (goCheck rt) va
       vt <- eval (ctx ^. #env) t
       u <- check (ctx & Ctx.extend x va vt) ru vb
-      pure $ Let x a t u
-    (R.Lam x rt, V.Pi _ va closure) -> do
+      pure $ Let x t u
+    (R.Lam x mra rt, V.Pi _ va' closure) -> do
+      whenJust mra \ra -> do
+        va <- eval (ctx ^. #env) =<< goCheck ra V.U
+        elabUnify ctx va va'
       vb <- openClosure (ctx ^. #level) closure
-      Lam x <$> check (ctx & Ctx.bind x va) rt vb
-    (rt, va) -> do
-      (t, va') <- goInfer rt
+      Lam x <$> check (ctx & Ctx.bind x va') rt vb
+    (rt, va') -> do
+      (t, va) <- goInfer rt
       t <$ elabUnify ctx va va'
 
   goInfer = \case
@@ -74,21 +80,25 @@ checkInfer ctx = (goCheck, goInfer)
       Nothing -> throw $ ElabError ctx (ScopeError x)
       Just (lx, va) -> pure (Var lx, va)
     R.Hole -> (,) <$> insertMeta ctx <*> insertMetaValue ctx
-    R.Let x ra rt ru -> do
-      a <- goCheck ra V.U
-      va <- eval (ctx ^. #env) a
-      t <- goCheck rt va
+    R.Let x mra rt ru -> do
+      (t, va) <- case mra of
+        Nothing -> goInfer rt
+        Just ra -> do
+          va <- eval (ctx ^. #env) =<< goCheck ra V.U
+          traverseToFst (goCheck rt) va
       vt <- eval (ctx ^. #env) t
       (u, vb) <- infer (ctx & Ctx.extend x va vt) ru
-      pure (Let x a t u, vb)
+      pure (Let x t u, vb)
     R.U -> pure (U, V.U)
     R.Pi x ra rb -> do
       a <- goCheck ra V.U
       va <- eval (ctx ^. #env) a
       b <- check (ctx & Ctx.bind x va) rb V.U
       pure (Pi x a b, V.U)
-    R.Lam x rt -> do
-      va <- insertMetaValue ctx
+    R.Lam x mra rt -> do
+      va <- case mra of
+        Nothing -> insertMetaValue ctx
+        Just ra -> eval (ctx ^. #env) =<< goCheck ra V.U
       (t, vb) <- infer (ctx & Ctx.bind x va) rt
       closure <- closeValue (ctx ^. #env) vb
       pure (Lam x t, V.Pi x va closure)
@@ -96,7 +106,7 @@ checkInfer ctx = (goCheck, goInfer)
       (t, vp0) <- goInfer rt
       (va, closure) <-
         forceValue vp0 >>= \case
-          V.Pi _ va vb -> pure (va, vb)
+          V.Pi _ va closure -> pure (va, closure)
           vp -> do
             va <- insertMetaValue ctx
             closure <-

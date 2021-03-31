@@ -11,7 +11,7 @@ import Unnamed.Var.Name (Name)
 data Term
   = Var {-# UNPACK #-} Level
   | Meta {-# UNPACK #-} Meta (Maybe BoundMask)
-  | Let {-# UNPACK #-} Name Term Term Term
+  | Let {-# UNPACK #-} Name Term Term
   | U
   | Pi {-# UNPACK #-} Name Term Term
   | Lam {-# UNPACK #-} Name Term
