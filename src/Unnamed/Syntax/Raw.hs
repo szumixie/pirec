@@ -14,11 +14,12 @@ data Term
   | Pi {-# UNPACK #-} Name Term Term
   | Lam {-# UNPACK #-} Name (Maybe Term) Term
   | App Term Term
-  | RowType [Name] Term
-  | RowLit [(Name, Term)]
-  | RowCons [(Name, Term)] Term
+  | RowType Term
+  | RowEmpty
+  | RowExt {-# UNPACK #-} Name Term Term
   | RecordType Term
-  | RecordLit [(Name, Term)]
+  | RecordEmpty
+  | RecordExt {-# UNPACK #-} Name Term Term
   | RecordProj {-# UNPACK #-} Name Term
-  | RecordMod {-# UNPACK #-} Name Term Term
+  | RecordRestr {-# UNPACK #-} Name Term
   deriving stock (Show)

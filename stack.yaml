@@ -1,7 +1,9 @@
-resolver: lts-17.8
+resolver: lts-17.9
 packages:
   - .
 extra-deps:
+  - relude-1.0.0.1
+
   - optics-0.4
   - optics-core-0.4
   - optics-extra-0.4

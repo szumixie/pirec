@@ -1,6 +1,6 @@
 let Nat = (A : U) -> Record { z : A, s : A -> A } -> A
   ; 5 : Nat = \A r. r.s (r.s (r.s (r.s (r.s r.z))))
-  ; add : Nat -> Nat -> Nat = \x y A r. x _ r.{ z = y _ r }
-  ; add5x : (R : Row\{x} U) -> Record { x : Nat | R } -> Record { x : Nat | R }
-           = \R r. r.{ x = add r.x 5 }
+  ; add : Nat -> Nat -> Nat = \x y A r. x _ { z = y _ r | r.-z }
+  ; add5x : (R : Row U) -> Record { x : Nat | R } -> Record { x : Nat | R }
+          = \R r. { x = add r.x 5 | r.-x }
  in add5x _ { x = 5, y = 5 }

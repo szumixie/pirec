@@ -4,8 +4,9 @@ let Eq : (A : U) -> A -> A -> U = \A x y. (P : A -> U) -> P x -> P y
   ; 0 : Nat = \A r. r.z
   ; 1 : Nat = \A r. r.s r.z
   ; 2 : Nat = \A r. r.s (r.s r.z)
-  ; add : Nat -> Nat -> Nat = \x y A r. x _ r.{ z = y _ r }
-  ; mul : Nat -> Nat -> Nat = \x y A r. x _ r.{ s = \(a : A). y _ r.{ z = a } }
+  ; add : Nat -> Nat -> Nat = \x y A r. x _ { z = y _ r | r.-z }
+  ; mul : Nat -> Nat -> Nat
+        = \x y A r. x _ { s = \(a : A). y _ { z = a | r.-z } | r.-s }
   ; mul2 : Nat -> Nat -> Nat = \x y. y _ { z = 0, s = add x }
   ; pow : Nat -> Nat -> Nat = \x y. y _ { z = 1, s = mul2 x }
   ; 4 = add 2 2

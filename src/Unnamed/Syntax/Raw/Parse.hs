@@ -29,15 +29,15 @@ atoms =
   [ termVar
   , termHole
   , termU
+  , try termRowEmpty
   , try termRowLit
-  , try termRowCons
-  , try termEmptyRecordCon
-  , termRecordCon
+  , try termRecordEmpty
+  , termRecordLit
   ]
 
 ops :: [Level]
 ops =
-  [ LeftAssoc [] [] [try termRecordProj, termRecordMod]
+  [ LeftAssoc [] [] [try termRecordProj, termRecordRestr]
   , LeftAssoc [termApp] [termRowType, termRecordType] []
   , RightAssoc [termFun] [termLet, try termPi, termLam] []
   ]
@@ -118,31 +118,31 @@ termApp :: Parser (R.Term -> R.Term -> R.Term)
 termApp = pure R.App
 
 termRowType :: Parser (R.Term -> R.Term)
-termRowType = R.RowType <$ row <* diff <*> braces (many ident)
+termRowType = R.RowType <$ row
+
+termRowEmpty :: Parser R.Term
+termRowEmpty = braces $ pure R.RowEmpty
 
 termRowLit :: Parser R.Term
-termRowLit =
-  braces $ R.RowLit <$> ((,) <$> ident <* colon <*> term) `sepEndBy` comma
-
-termRowCons :: Parser R.Term
-termRowCons =
-  braces $
-    R.RowCons <$> ((,) <$> ident <* colon <*> term) `sepEndBy1` comma <* pipe
-      <*> term
+termRowLit = braces do
+  exts <- (R.RowExt <$> ident <* colon <*> term) `sepEndBy1` comma
+  rest <- option R.RowEmpty $ pipe *> term
+  pure $ foldr ($) rest exts
 
 termRecordType :: Parser (R.Term -> R.Term)
 termRecordType = R.RecordType <$ record
 
-termRecordCon :: Parser R.Term
-termRecordCon =
-  braces $ R.RecordLit <$> ((,) <$> ident <* equals <*> term) `sepEndBy1` comma
+termRecordEmpty :: Parser R.Term
+termRecordEmpty = braces $ R.RecordEmpty <$ equals
 
-termEmptyRecordCon :: Parser R.Term
-termEmptyRecordCon = R.RecordLit [] <$ braces equals
+termRecordLit :: Parser R.Term
+termRecordLit = braces do
+  exts <- (R.RecordExt <$> ident <* equals <*> term) `sepEndBy1` comma
+  rest <- option R.RecordEmpty $ pipe *> term
+  pure $ foldr ($) rest exts
 
 termRecordProj :: Parser (R.Term -> R.Term)
 termRecordProj = R.RecordProj <$ dot <*> ident
 
-termRecordMod :: Parser (R.Term -> R.Term)
-termRecordMod =
-  uncurry R.RecordMod <$ dot <*> braces ((,) <$> ident <* equals <*> term)
+termRecordRestr :: Parser (R.Term -> R.Term)
+termRecordRestr = R.RecordRestr <$ dot <* minus <*> ident

@@ -16,9 +16,9 @@ import Optics
 import Prettyprinter
 
 import Unnamed.BoundMask qualified as BM
+import Unnamed.Data.MultiMapAlter qualified as MMA
 import Unnamed.Env (Env)
 import Unnamed.Env qualified as Env
-import Unnamed.LabelSet qualified as LS
 import Unnamed.Syntax.Core (Term (..))
 import Unnamed.Var.Level (Level (..))
 import Unnamed.Var.Name (Name (..))
@@ -69,28 +69,37 @@ prettyTermWith ctx@(Context env names) = go
         backslash <> pretty x <> dot
           <+> prettyTermWith (ctx & extendCtx x) 0 t
     App t u -> parensIf (prec > 10) $ go 10 t <+> go 11 u
-    RowType (LS.Has _) a -> parensIf (prec > 10) $ "Row" <+> go 11 a
-    RowType (LS.Lacks labels) a ->
-      parensIf (prec > 10) $
-        "Row" <> backslash <> braces (hsep (pretty <$> toList labels))
-          <+> go 11 a
+    RowType a -> parensIf (prec > 10) $ "Row" <+> go 11 a
     RowLit ts ->
       align . encloseSep "{ " " }" ", " $
-        itoList ts <&> \(x, t) -> pretty x <+> colon <+> go 0 t
-    RowCons ts r ->
+        itoList ts <&> \((x, _), t) -> pretty x <+> colon <+> go 0 t
+    RowExt ts r ->
       align
         ( encloseSep "{ " " | " ", " $
-            itoList ts <&> \(x, t) -> pretty x <+> colon <+> go 0 t
+            itoList ts <&> \((x, _), t) -> pretty x <+> colon <+> go 0 t
         )
         <> go 0 r
         <> " }"
     RecordType r -> parensIf (prec > 10) $ "Record" <+> go 11 r
     RecordLit ts ->
       align . encloseSep "{ " " }" ", " $
-        itoList ts <&> \(x, t) -> pretty x <+> colon <+> go 0 t
-    RecordProj label t -> go 21 t <> dot <> pretty label
-    RecordMod label u t ->
-      go 21 t <> dot <> braces (pretty label <+> equals <+> go 0 u)
+        itoList ts <&> \((x, _), t) -> pretty x <+> colon <+> go 0 t
+    RecordProj label index t ->
+      foldr ($) (go 21 t) (replicate index (<> ".-" <> pretty label))
+        <> dot
+        <> pretty label
+    RecordAlter ts u ->
+      let (restrs, exts) =
+            ts & itoListOf MMA.ifoldedAlter
+              & partitionWith \(x, mt) -> case mt of
+                Nothing -> Left x
+                Just t -> Right (x, t)
+       in align
+            ( encloseSep "{ " " | " ", " $
+                exts <&> \(x, t) -> pretty x <+> equals <+> go 0 t
+            )
+            <> foldr (\label -> (<> ".-" <> pretty label)) (go 21 u) restrs
+            <> " }"
 
 freshName :: HashSet Name -> Name -> Name
 freshName names name@(Name ts)

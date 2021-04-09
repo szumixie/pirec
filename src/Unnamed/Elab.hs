@@ -3,19 +3,15 @@ module Unnamed.Elab (check, infer) where
 import Relude
 import Relude.Extra.Tuple (traverseToFst)
 
-import Data.HashMap.Lazy qualified as Map
-import Data.HashSet qualified as Set
-
 import Control.Effect
 import Control.Effect.Error
 import Optics
 
-import Unnamed.LabelSet qualified as LS
+import Unnamed.Data.MultiMapAlter qualified as MMA
 import Unnamed.Syntax.Core (Term (..))
 import Unnamed.Syntax.Raw qualified as R
 import Unnamed.Value (Value)
 import Unnamed.Value qualified as V
-import Unnamed.Var.Name (Name)
 
 import Unnamed.Effect.Meta
 import Unnamed.Elab.Context (Context)
@@ -53,7 +49,7 @@ checkInfer ::
 checkInfer ctx = (goCheck, goInfer)
  where
   goCheck = curry \case
-    (R.Span span rt, va) -> check (ctx & #span .~ span) rt va
+    (R.Span sp rt, va) -> check (ctx & #span .~ sp) rt va
     (R.Hole, _) -> insertMeta ctx
     (R.Let x mra rt ru, vb) -> do
       (t, va) <- case mra of
@@ -75,7 +71,7 @@ checkInfer ctx = (goCheck, goInfer)
       t <$ elabUnify ctx va va'
 
   goInfer = \case
-    R.Span span rt -> infer (ctx & #span .~ span) rt
+    R.Span sp rt -> infer (ctx & #span .~ sp) rt
     R.Var x -> case ctx ^. #names % at x of
       Nothing -> throw $ ElabError ctx (ScopeError x)
       Just (lx, va) -> pure (Var lx, va)
@@ -117,75 +113,47 @@ checkInfer ctx = (goCheck, goInfer)
       vu <- eval (ctx ^. #env) u
       vb <- appClosure closure vu
       pure (App t u, vb)
-    R.RowType labels ra -> do
+    R.RowType ra -> do
       a <- goCheck ra V.U
-      ulabels <- labelsUnique ctx $ (,()) <$> labels
-      pure (RowType (LS.Lacks $ Set.fromMap ulabels) a, V.U)
-    R.RowLit [] -> do
+      pure (RowType a, V.U)
+    R.RowEmpty -> do
       va <- insertMetaValue ctx
-      pure (RowLit mempty, V.RowType mempty va)
-    R.RowLit ((label1, rt1) : rts) -> do
-      (t1, va) <- goInfer rt1
-      rts' <- labelsUnique ctx ((label1, rt1) : rts)
-      ts <- ifor rts' \label rt ->
-        if label == label1 then pure t1 else goCheck rt va
-      pure (RowLit ts, V.RowType (LS.Has $ Map.keysSet ts) va)
-    R.RowCons rts rr -> do
-      (r, vrt0) <- goInfer rr
-      rts' <- labelsUnique ctx rts
-      let labelSet = Map.keysSet rts'
-      forceValue vrt0 >>= \case
-        V.RowType labels va -> do
-          unless (LS.disjoint (LS.Has labelSet) labels) $
-            case LS.intersection (LS.Has labelSet) labels of
-              LS.Has ilabels -> throw $ ElabError ctx (FieldOverlap ilabels)
-              LS.Lacks _ -> error "bug"
-          ts <- traverse (`goCheck` va) rts'
-          pure (RowCons ts r, V.RowType (LS.Has labelSet <> labels) va)
-        vrt -> do
-          va <- insertMetaValue ctx
-          elabUnify ctx vrt $ V.RowType (LS.Lacks labelSet) va
-          ts <- traverse (`goCheck` va) rts'
-          pure (RowCons ts r, V.RowType LS.full va)
+      pure (RowLit mempty, V.RowType va)
+    R.RowExt label rt rts -> do
+      (t, va) <- goInfer rt
+      ts <- goCheck rts (V.RowType va)
+      pure (RowExt (one (label, t)) ts, V.RowType va)
     R.RecordType rr -> do
-      r <- goCheck rr $ V.RowType LS.full V.U
+      r <- goCheck rr (V.RowType V.U)
       pure (RecordType r, V.U)
-    R.RecordLit rts -> do
-      rts' <- labelsUnique ctx rts
-      tvas <- traverse goInfer rts'
-      pure (RecordLit $ fst <$> tvas, V.RecordType $ V.RowLit (snd <$> tvas))
+    R.RecordEmpty -> do
+      pure (RecordLit mempty, V.RecordType $ V.RowLit mempty)
+    R.RecordExt label rt ru -> do
+      (t, va) <- goInfer rt
+      (u, vp) <- goInfer ru
+      vr <- insertMetaValue ctx
+      elabUnify ctx vp $ V.RecordType vr
+      pure
+        ( RecordAlter (MMA.singleInsert label t) u
+        , V.RecordType (V.rowExt (one (label, va)) vr)
+        )
     R.RecordProj label rt -> do
-      (t, vr0) <- goInfer rt
-      forceValue vr0 >>= \case
-        V.RecordType (V.RowLit as)
-          | Just a <- as ^. at label -> pure (RecordProj label t, a)
-        vr -> do
-          va <- insertMetaValue ctx
-          vr' <- insertMetaValue ctx
-          elabUnify ctx vr $ V.RecordType (rowConsValue (one (label, va)) vr')
-          pure (RecordProj label t, va)
-    R.RecordMod label ru rt -> do
-      (t, vr0) <- goInfer rt
-      (u, vb) <- goInfer ru
-      forceValue vr0 >>= \case
-        V.RecordType (V.RowLit as) ->
-          pure
-            ( RecordMod label u t
-            , V.RecordType $ V.RowLit (as & at label ?~ vb)
-            )
-        vr -> do
-          va <- insertMetaValue ctx
-          vr' <- insertMetaValue ctx
-          elabUnify ctx vr $ V.RecordType (rowConsValue (one (label, va)) vr')
-          pure
-            ( RecordMod label u t
-            , V.RecordType $ rowConsValue (one (label, vb)) vr'
-            )
-
-labelsUnique ::
-  Eff (Throw ElabError) m => Context -> [(Name, a)] -> m (HashMap Name a)
-labelsUnique ctx = foldlM go mempty
- where
-  go m (x, t)
-    | Just _ <- m ^. at x = throw $ ElabError ctx (DupField x)
-    | otherwise = pure $ m & at x ?!~ t
+      (t, vp0) <- goInfer rt
+      va <-
+        forceValue vp0 >>= \case
+          V.RecordType (V.RowLit vas)
+            | Just va <- vas ^? ix (label, 0) -> pure va
+          V.RecordType (V.Neut _ (V.RowExt vas _))
+            | Just va <- vas ^? ix (label, 0) -> pure va
+          vp -> do
+            va <- insertMetaValue ctx
+            vr <- insertMetaValue ctx
+            elabUnify ctx vp $ V.RecordType (V.rowExt (one (label, va)) vr)
+            pure va
+      pure (RecordProj label 0 t, va)
+    R.RecordRestr label rt -> do
+      (t, vp) <- goInfer rt
+      va <- insertMetaValue ctx
+      vr <- insertMetaValue ctx
+      elabUnify ctx vp $ V.RecordType (V.rowExt (one (label, va)) vr)
+      pure (RecordAlter (MMA.singleDelete label) t, V.RecordType vr)

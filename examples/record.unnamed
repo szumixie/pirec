@@ -1,6 +1,7 @@
 let Nat = (A : _) -> Record { z : A, s : A -> A } -> A
-  ; add : Nat -> Nat -> Nat = \x y A r. x _ r.{ z = y _ r }
-  ; mul : Nat -> Nat -> Nat = \x y A r. x _ r.{ s = \(a : A). y _ r.{ z = a } }
+  ; add : Nat -> Nat -> Nat = \x y A r. x _ { z = y _ r | r.-z }
+  ; mul : Nat -> Nat -> Nat
+        = \x y A r. x _ { s = \(a : A). y _ { z = a | r.-z } | r.-s }
   ; 2 : Nat = \A r. r.s (r.s r.z)
   ; 4 = add 2 2
   ; 16 = mul 4 4

@@ -88,16 +88,16 @@ dependencies:
   - base
   - relude
 
-  - bytestring
-  - text
+  - these
+  - semialign
+
   - text-short
-  - containers
-  - unordered-containers
   - vector
   - mutable-containers
   - hashtables
 
   - optics
+  - these-optics
 
   - transformers
   - mtl
@@ -178,6 +178,7 @@ when:
       - pretty-simple
   - condition: flag(dump)
     ghc-options:
+      - -O2
       - -ddump-to-file
       - -dumpdir=.dumps
       - -ddump-simpl

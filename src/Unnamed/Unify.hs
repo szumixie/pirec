@@ -2,14 +2,13 @@ module Unnamed.Unify (unify) where
 
 import Relude
 
-import Data.HashMap.Lazy qualified as Map
-
 import Control.Effect
 import Control.Effect.Error
 import Optics
 
+import Unnamed.Data.MultiMap qualified as MM
+import Unnamed.Data.MultiMapAlter qualified as MMA
 import Unnamed.Env qualified as Env
-import Unnamed.LabelSet qualified as LS
 import Unnamed.Syntax.Core
 import Unnamed.Value (Spine, Value)
 import Unnamed.Value qualified as V
@@ -67,24 +66,22 @@ rename meta = goRenaming
                     | otherwise -> pure $ Meta mx Nothing
                 V.App spine vt ->
                   App <$> goSpine spine <*> go vt
-                V.RowCons vts spine ->
-                  RowCons <$> traverse go vts <*> goSpine spine
-                V.RecordProj label spine ->
-                  RecordProj label <$> goSpine spine
-                V.RecordMod label vu spine ->
-                  RecordMod label <$> go vu <*> goSpine spine
+                V.RowExt vts spine ->
+                  RowExt <$> traverse go vts <*> goSpine spine
+                V.RecordProj label index spine ->
+                  RecordProj label index <$> goSpine spine
+                V.RecordAlter vts spine ->
+                  RecordAlter <$> traverse go vts <*> goSpine spine
            in goSpine spine0
         V.U -> pure U
-        V.Pi x va closure ->
-          Pi x <$> go va
-            <*> (goRenaming (liftRenaming renaming) =<< openClosure tgt closure)
-        V.Lam x closure ->
-          Lam x
-            <$> (goRenaming (liftRenaming renaming) =<< openClosure tgt closure)
-        V.RowType labels va -> RowType labels <$> go va
+        V.Pi x va closure -> Pi x <$> go va <*> goClosure closure
+        V.Lam x closure -> Lam x <$> goClosure closure
+        V.RowType va -> RowType <$> go va
         V.RowLit vts -> RowLit <$> traverse go vts
         V.RecordType vr -> RecordType <$> go vr
         V.RecordLit vts -> RecordLit <$> traverse go vts
+    goClosure closure =
+      goRenaming (liftRenaming renaming) =<< openClosure tgt closure
 
 solve ::
   Effs [MetaCtx, Throw UnifyError] m => Level -> Meta -> Spine -> Value -> m ()
@@ -108,44 +105,49 @@ unify lvl = go
                   (V.Nil, V.Nil) -> pass
                   (V.App spine vt, V.App spine' vt') ->
                     goSpine spine spine' *> go vt vt'
-                  (V.RowCons vts spine, V.RowCons vts' spine')
-                    | Map.keysSet vts == Map.keysSet vts' -> do
-                      sequenceA_ (Map.intersectionWith go vts vts')
+                  (V.RowExt vts spine, V.RowExt vts' spine')
+                    | Just ms <- MM.match go vts vts' -> do
+                      sequenceA_ ms
                       goSpine spine spine'
-                  (V.RecordProj label spine, V.RecordProj label' spine')
-                    | label == label' -> goSpine spine spine'
-                  (V.RecordMod label vu spine, V.RecordMod label' vu' spine')
-                    | label == label' -> go vu vu' *> goSpine spine spine'
+                  ( V.RecordProj label index spine
+                    , V.RecordProj label' index' spine'
+                    )
+                      | label == label' && index == index' ->
+                        goSpine spine spine'
+                  (V.RecordAlter vts spine, V.RecordAlter vts' spine')
+                    | Just ms <- MMA.match go vts vts' -> do
+                      sequenceA_ ms
+                      goSpine spine spine'
                   (spine, spine') ->
                     throw $ Mismatch (V.Neut x spine) (V.Neut x' spine')
              in goSpine spine0 spine0'
-        (V.Neut x (V.RowCons vts spine), V.Neut x' (V.RowCons vts' spine'))
-          | Map.keysSet vts == Map.keysSet vts' -> do
-            sequenceA_ (Map.intersectionWith go vts vts')
+        (V.Neut x (V.RowExt vts spine), V.Neut x' (V.RowExt vts' spine'))
+          | Just ms <- MM.match go vts vts' -> do
+            sequenceA_ ms
             go (V.Neut x spine) (V.Neut x' spine')
-        ( V.Neut (V.Flex mx) (V.RowCons vts spine)
-          , V.Neut (V.Flex mx') (V.RowCons vts' spine')
-          ) -> do
-            solve lvl mx spine $
-              V.Neut (V.Flex mx') (V.RowCons (Map.difference vts' vts) spine')
-            solve lvl mx' spine' $
-              V.Neut (V.Flex mx) (V.RowCons (Map.difference vts vts') spine)
-        ( V.Neut (V.Flex mx) (V.RowCons vts spine)
-          , V.Neut x' (V.RowCons vts' spine')
+        ( V.Neut (V.Flex mx) (V.RowExt vts spine)
+          , V.Neut x' (V.RowExt vts' spine')
           )
-            | Map.isSubmapOfBy (\_ _ -> True) vts vts' ->
-              solve lvl mx spine $
-                V.Neut x' (V.RowCons (Map.difference vts' vts) spine')
-        ( V.Neut x (V.RowCons vts spine)
-          , V.Neut (V.Flex mx') (V.RowCons vts' spine')
+            | Just vts'' <- MM.superDifference vts' vts ->
+              solve lvl mx spine $ V.Neut x' (V.RowExt vts'' spine')
+        ( V.Neut x (V.RowExt vts spine)
+          , V.Neut (V.Flex mx') (V.RowExt vts' spine')
           )
-            | Map.isSubmapOfBy (\_ _ -> True) vts' vts ->
+            | Just vts'' <- MM.superDifference vts vts' ->
               solve lvl mx' spine' $
-                V.Neut x (V.RowCons (Map.difference vts vts') spine)
-        (V.Neut (V.Flex mx) (V.RowCons vts spine), V.RowLit vts') ->
-          solve lvl mx spine $ V.RowLit (Map.difference vts' vts)
-        (V.RowLit vts, V.Neut (V.Flex mx) (V.RowCons vts' spine)) ->
-          solve lvl mx spine $ V.RowLit (Map.difference vts vts')
+                V.Neut x (V.RowExt vts'' spine)
+        ( V.Neut (V.Flex mx) (V.RowExt vts spine)
+          , V.Neut (V.Flex mx') (V.RowExt vts' spine')
+          ) -> do
+            mx'' <- freshMeta
+            solve lvl mx spine $
+              V.Neut (V.Flex mx'') (V.RowExt (MM.difference vts' vts) spine')
+            solve lvl mx' spine' $
+              V.Neut (V.Flex mx'') (V.RowExt (MM.difference vts vts') spine)
+        (V.Neut (V.Flex mx) (V.RowExt vts spine), V.RowLit vts') ->
+          solve lvl mx spine $ V.RowLit (MM.difference vts' vts)
+        (V.RowLit vts, V.Neut (V.Flex mx) (V.RowExt vts' spine)) ->
+          solve lvl mx spine $ V.RowLit (MM.difference vts vts')
         (V.Neut (V.Flex mx) spine, vt) -> solve lvl mx spine vt
         (vt, V.Neut (V.Flex mx) spine) -> solve lvl mx spine vt
         (V.U, V.U) -> pass
@@ -164,17 +166,16 @@ unify lvl = go
         (V.Neut x spine, V.Lam _ closure) -> do
           vt <- openClosure lvl closure
           unify (lvl + 1) (V.Neut x $ V.App spine (V.var lvl)) vt
-        (V.RowType labels va, V.RowType labels' va')
-          | labels `LS.isSubsetOf` labels' -> go va va'
+        (V.RowType va, V.RowType va') -> go va va'
         (V.RowLit vts, V.RowLit vts')
-          | Map.keysSet vts == Map.keysSet vts' ->
-            sequenceA_ (Map.intersectionWith go vts vts')
+          | Just ms <- MM.match go vts vts' ->
+            sequenceA_ ms
         (V.RecordType va, V.RecordType va') -> go va va'
         (V.RecordLit vts, V.RecordLit vts')
-          | Map.keysSet vts == Map.keysSet vts' ->
-            sequenceA_ $ Map.intersectionWith go vts vts'
-        (V.RecordLit vts, V.Neut x spine) ->
-          ifor_ vts \label vt -> go vt (V.Neut x $ V.RecordProj label spine)
-        (V.Neut x spine, V.RecordLit vts) ->
-          ifor_ vts \label vt -> go (V.Neut x $ V.RecordProj label spine) vt
+          | Just ms <- MM.match go vts vts' ->
+            sequenceA_ ms
+        (V.RecordLit vts, vt'@V.Neut{}) ->
+          ifor_ vts \(label, index) vt -> go vt (V.recordProj label index vt')
+        (vt@V.Neut{}, V.RecordLit vts') ->
+          ifor_ vts' \(label, index) vt' -> go (V.recordProj label index vt') vt
         (vt, vt') -> throw $ Mismatch vt vt'
