@@ -31,12 +31,12 @@ eval env t = do
        where
         go = \case
           Var lx -> env & Env.index lx ?: error "bug"
-          Meta mx mmask ->
-            let t = mlookup mx ?: V.meta mx
-             in case mmask of
-                  Nothing -> t
-                  Just mask ->
-                    env & foldlOf' (BM.masked mask) (appValuePure mlookup) t
+          Meta mx mmask -> case mmask of
+            Nothing -> t
+            Just mask ->
+              env & foldlOf' (BM.masked mask) (appValuePure mlookup) t
+           where
+            t = mlookup mx ?: V.meta mx
           Let _ t u -> goEnv (env & Env.extend (go t)) u
           U -> V.U
           Pi x a b -> V.Pi x (go a) (V.Closure env b)
@@ -86,20 +86,20 @@ quote !lvl = go
  where
   go =
     forceValue >=> \case
-      V.Neut x spine ->
-        let goSpine = \case
-              V.Nil -> pure case x of
-                V.Rigid lx -> Var lx
-                V.Flex mx -> Meta mx Nothing
-              V.App spine t ->
-                App <$> goSpine spine <*> go t
-              V.RowExt ts spine ->
-                RowExt <$> traverse go ts <*> goSpine spine
-              V.RecordProj label index spine ->
-                RecordProj label index <$> goSpine spine
-              V.RecordAlter ts spine ->
-                RecordAlter <$> traverse go ts <*> goSpine spine
-         in goSpine spine
+      V.Neut x spine -> goSpine spine
+       where
+        goSpine = \case
+          V.Nil -> pure case x of
+            V.Rigid lx -> Var lx
+            V.Flex mx -> Meta mx Nothing
+          V.App spine t ->
+            App <$> goSpine spine <*> go t
+          V.RowExt ts spine ->
+            RowExt <$> traverse go ts <*> goSpine spine
+          V.RecordProj label index spine ->
+            RecordProj label index <$> goSpine spine
+          V.RecordAlter ts spine ->
+            RecordAlter <$> traverse go ts <*> goSpine spine
       V.U -> pure U
       V.Pi x a closure -> Pi x <$> go a <*> quoteClosure lvl closure
       V.Lam x closure -> Lam x <$> quoteClosure lvl closure

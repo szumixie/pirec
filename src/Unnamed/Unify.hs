@@ -55,24 +55,24 @@ rename meta = goRenaming
    where
     go =
       forceValue >=> \case
-        V.Neut x spine ->
-          let goSpine = \case
-                V.Nil -> case x of
-                  V.Rigid lx -> case m ^. at lx of
-                    Nothing -> throw $ ScopeError lx
-                    Just lx -> pure $ Var lx
-                  V.Flex mx
-                    | mx == meta -> throw $ OccursError meta
-                    | otherwise -> pure $ Meta mx Nothing
-                V.App spine t ->
-                  App <$> goSpine spine <*> go t
-                V.RowExt ts spine ->
-                  RowExt <$> traverse go ts <*> goSpine spine
-                V.RecordProj label index spine ->
-                  RecordProj label index <$> goSpine spine
-                V.RecordAlter ts spine ->
-                  RecordAlter <$> traverse go ts <*> goSpine spine
-           in goSpine spine
+        V.Neut x spine -> goSpine spine
+         where
+          goSpine = \case
+            V.Nil -> case x of
+              V.Rigid lx -> case m ^. at lx of
+                Nothing -> throw $ ScopeError lx
+                Just lx -> pure $ Var lx
+              V.Flex mx
+                | mx == meta -> throw $ OccursError meta
+                | otherwise -> pure $ Meta mx Nothing
+            V.App spine t ->
+              App <$> goSpine spine <*> go t
+            V.RowExt ts spine ->
+              RowExt <$> traverse go ts <*> goSpine spine
+            V.RecordProj label index spine ->
+              RecordProj label index <$> goSpine spine
+            V.RecordAlter ts spine ->
+              RecordAlter <$> traverse go ts <*> goSpine spine
         V.U -> pure U
         V.Pi x a closure -> Pi x <$> go a <*> goClosure closure
         V.Lam x closure -> Lam x <$> goClosure closure
@@ -99,28 +99,27 @@ unify lvl = go
   go =
     curry $
       traverseOf both forceValue >=> \case
-        (V.Neut x spine, V.Neut x' spine')
-          | x == x' ->
-            let goSpine = curry \case
-                  (V.Nil, V.Nil) -> pass
-                  (V.App spine t, V.App spine' t') ->
-                    goSpine spine spine' *> go t t'
-                  (V.RowExt ts spine, V.RowExt ts' spine')
-                    | Just ms <- MM.match go ts ts' -> do
-                      sequenceA_ ms
-                      goSpine spine spine'
-                  ( V.RecordProj label index spine
-                    , V.RecordProj label' index' spine'
-                    )
-                      | label == label' && index == index' ->
-                        goSpine spine spine'
-                  (V.RecordAlter ts spine, V.RecordAlter ts' spine')
-                    | Just ms <- MMA.match go ts ts' -> do
-                      sequenceA_ ms
-                      goSpine spine spine'
-                  (spine, spine') ->
-                    throw $ Mismatch (V.Neut x spine) (V.Neut x' spine')
-             in goSpine spine spine'
+        (V.Neut x spine, V.Neut x' spine') | x == x' -> goSpine spine spine'
+         where
+          goSpine = curry \case
+            (V.Nil, V.Nil) -> pass
+            (V.App spine t, V.App spine' t') ->
+              goSpine spine spine' *> go t t'
+            (V.RowExt ts spine, V.RowExt ts' spine')
+              | Just ms <- MM.match go ts ts' -> do
+                sequenceA_ ms
+                goSpine spine spine'
+            ( V.RecordProj label index spine
+              , V.RecordProj label' index' spine'
+              )
+                | label == label' && index == index' ->
+                  goSpine spine spine'
+            (V.RecordAlter ts spine, V.RecordAlter ts' spine')
+              | Just ms <- MMA.match go ts ts' -> do
+                sequenceA_ ms
+                goSpine spine spine'
+            (spine, spine') ->
+              throw $ Mismatch (V.Neut x spine) (V.Neut x' spine')
         (V.Neut x (V.RowExt ts spine), V.Neut x' (V.RowExt ts' spine'))
           | Just ms <- MM.match go ts ts' -> do
             sequenceA_ ms

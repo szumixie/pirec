@@ -69,15 +69,15 @@ addPrec p = \case
     f <- option id $ choice pf
     x <- p
     go $ f x
-  RightAssoc infr pf sf ->
-    let go = withSpan do
-          choice pf <*> go <|> do
-            x <- p
-            choice
-              [ choice infr ?? x <*> go
-              , option id (choice sf) ?? x
-              ]
-     in go
+  RightAssoc infr pf sf -> go
+   where
+    go = withSpan do
+      choice pf <*> go <|> do
+        x <- p
+        choice
+          [ choice infr ?? x <*> go
+          , option id (choice sf) ?? x
+          ]
 
 termVar :: Parser R.Term
 termVar = R.Var <$> ident

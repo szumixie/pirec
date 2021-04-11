@@ -89,17 +89,18 @@ prettyTermWith ctx@(Context env names) = go
         <> dot
         <> pretty label
     RecordAlter ts u ->
-      let (restrs, exts) =
-            ts & itoListOf MMA.ifoldedAlter
-              & partitionWith \(x, mt) -> case mt of
-                Nothing -> Left x
-                Just t -> Right (x, t)
-       in align
-            ( encloseSep "{ " " | " ", " $
-                exts <&> \(x, t) -> pretty x <+> equals <+> go 0 t
-            )
-            <> foldr (\label -> (<> ".-" <> pretty label)) (go 21 u) restrs
-            <> " }"
+      align
+        ( encloseSep "{ " " | " ", " $
+            exts <&> \(x, t) -> pretty x <+> equals <+> go 0 t
+        )
+        <> foldr (\label -> (<> ".-" <> pretty label)) (go 21 u) restrs
+        <> " }"
+     where
+      (restrs, exts) =
+        ts & itoListOf MMA.ifoldedAlter
+          & partitionWith \(x, mt) -> case mt of
+            Nothing -> Left x
+            Just t -> Right (x, t)
 
 freshName :: HashSet Name -> Name -> Name
 freshName names name@(Name ts)

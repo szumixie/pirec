@@ -46,9 +46,9 @@ uncons (RList s ts) = case ts of
   TNil -> Nothing
   TCons w t ts -> case t of
     Leaf x -> Just (x, RList (s - 1) ts)
-    Node x t1 t2 ->
-      let hw = w `div` 2
-       in Just (x, RList (s - 1) . TCons hw t1 . TCons hw t2 $ ts)
+    Node x t1 t2 -> Just (x, RList (s - 1) . TCons hw t1 . TCons hw t2 $ ts)
+     where
+      hw = w `div` 2
 
 instance AsEmpty (RList a) where
   _Empty = prism' (const empty) (null >>> bool Nothing (Just ()))
