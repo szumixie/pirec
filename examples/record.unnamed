@@ -5,10 +5,6 @@ let Nat = (A : _) -> Record { z : A, s : A -> A } -> A
   ; 2 : Nat = \A r. r.s (r.s r.z)
   ; 4 = add 2 2
   ; 16 = mul 4 4
-  ; F = \(x : Nat). x _ { z = Record {}, s = \A. Record { 1 : Nat, 2 : A } }
-  ; x : F 4 = { 1 = 2
-        , 2 = { 1 = 2
-        , 2 = { 1 = 4
-        , 2 = { 1 = 16
-        , 2 = {=} } } } }
- in x.2.2
+  ; F = \(x : Nat). Record (x _ { z = {}, s = \A. { field : Nat | A } })
+  ; x : F 4 = { field = 2 , field = 2 , field = 4 , field = 16 }
+ in x.-field.-field
