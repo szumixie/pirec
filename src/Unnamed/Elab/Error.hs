@@ -25,10 +25,6 @@ import Unnamed.Value.Pretty (prettyValue)
 data ElabErrorType
   = UnifyError Value Value UnifyError
   | ScopeError {-# UNPACK #-} Name
-  | DupField {-# UNPACK #-} Name
-  | FieldOverlap (HashSet Name)
-  | FieldMismatch (HashSet Name) (HashSet Name)
-  | FieldExpected {-# UNPACK #-} Name Value
   deriving stock (Show)
 
 declareFieldLabels
@@ -72,22 +68,6 @@ instance ShowErrorComponent CompElabError where
               , a'
               ]
         ScopeError x -> pure $ "variable" <+> pretty x <+> "out of scope"
-        DupField label -> pure $ "duplicate field" <+> pretty label <+> "in row"
-        FieldOverlap labels ->
-          pure $
-            "the following fields inferred to overlap:" <> line
-              <> hsep (pretty <$> toList labels)
-        FieldMismatch tset aset ->
-          pure $
-            vsep
-              [ "expected record with fields:"
-              , hsep $ pretty <$> toList aset
-              , "but got record with fields:"
-              , hsep $ pretty <$> toList tset
-              ]
-        FieldExpected label a -> do
-          a <- prettyValue ctx a
-          pure $ "expected field" <+> pretty label <+> "in type:" <> line <> a
   errorComponentLen err = end - start
    where
     Span start end = err ^. #error % #context % #span
