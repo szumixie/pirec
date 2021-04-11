@@ -25,20 +25,20 @@ data UnifyError
 
 prettyUnifyError :: Eff MetaLookup m => Context -> UnifyError -> m (Doc ann)
 prettyUnifyError ctx = \case
-  Mismatch va va' -> do
-    pa <- prettyValue ctx va
-    pa' <- prettyValue ctx va'
-    pure $ vsep ["expected type:", pa, "but got inferred type:", pa']
+  Mismatch a a' -> do
+    a <- prettyValue ctx a
+    a' <- prettyValue ctx a'
+    pure $ vsep ["expected type:", a, "but got inferred type:", a']
   ScopeError lvl -> do
-    px <- prettyValue ctx $ V.var lvl
-    pure $ "variable" <+> px <+> "not in scope"
+    x <- prettyValue ctx $ V.var lvl
+    pure $ "variable" <+> x <+> "not in scope"
   OccursError meta -> pure $ "occurs check failed when solving" <+> pretty meta
   Nonlinear lvl -> do
-    px <- prettyValue ctx $ V.var lvl
+    x <- prettyValue ctx $ V.var lvl
     pure $
-      "ambiguous hole due to multiple instances of variable" <+> px
+      "ambiguous hole due to multiple instances of variable" <+> x
         <+> "in the context"
-  Nonvariable vt -> do
-    pt <- prettyValue ctx vt
-    pure $ "got nonvariable in the context:" <> line <> pt
+  Nonvariable t -> do
+    t <- prettyValue ctx t
+    pure $ "got nonvariable in the context:" <> line <> t
   NonInvertable -> pure "got non-invertable spine"

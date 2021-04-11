@@ -38,13 +38,13 @@ invert lvl = go >>> fmap \(src, m) -> Renaming src lvl m
  where
   go = \case
     V.Nil -> pure (0, mempty)
-    V.App spine vt -> do
+    V.App spine t -> do
       (src, m) <- go spine
-      forceValue vt >>= \case
+      forceValue t >>= \case
         V.Neut (V.Rigid lx) V.Nil
           | Just _ <- m ^. at lx -> throw $ Nonlinear lx
           | otherwise -> pure (src + 1, m & at lx ?!~ src)
-        vt' -> throw $ Nonvariable vt'
+        t -> throw $ Nonvariable t
     _ -> throw NonInvertable
 
 rename ::
@@ -55,39 +55,39 @@ rename meta = goRenaming
    where
     go =
       forceValue >=> \case
-        V.Neut x spine0 ->
+        V.Neut x spine ->
           let goSpine = \case
                 V.Nil -> case x of
                   V.Rigid lx -> case m ^. at lx of
                     Nothing -> throw $ ScopeError lx
-                    Just lx' -> pure $ Var lx'
+                    Just lx -> pure $ Var lx
                   V.Flex mx
                     | mx == meta -> throw $ OccursError meta
                     | otherwise -> pure $ Meta mx Nothing
-                V.App spine vt ->
-                  App <$> goSpine spine <*> go vt
-                V.RowExt vts spine ->
-                  RowExt <$> traverse go vts <*> goSpine spine
+                V.App spine t ->
+                  App <$> goSpine spine <*> go t
+                V.RowExt ts spine ->
+                  RowExt <$> traverse go ts <*> goSpine spine
                 V.RecordProj label index spine ->
                   RecordProj label index <$> goSpine spine
-                V.RecordAlter vts spine ->
-                  RecordAlter <$> traverse go vts <*> goSpine spine
-           in goSpine spine0
+                V.RecordAlter ts spine ->
+                  RecordAlter <$> traverse go ts <*> goSpine spine
+           in goSpine spine
         V.U -> pure U
-        V.Pi x va closure -> Pi x <$> go va <*> goClosure closure
+        V.Pi x a closure -> Pi x <$> go a <*> goClosure closure
         V.Lam x closure -> Lam x <$> goClosure closure
-        V.RowType va -> RowType <$> go va
-        V.RowLit vts -> RowLit <$> traverse go vts
-        V.RecordType vr -> RecordType <$> go vr
-        V.RecordLit vts -> RecordLit <$> traverse go vts
+        V.RowType a -> RowType <$> go a
+        V.RowLit ts -> RowLit <$> traverse go ts
+        V.RecordType r -> RecordType <$> go r
+        V.RecordLit ts -> RecordLit <$> traverse go ts
     goClosure closure =
       goRenaming (liftRenaming renaming) =<< openClosure tgt closure
 
 solve ::
   Effs [MetaCtx, Throw UnifyError] m => Level -> Meta -> Spine -> Value -> m ()
-solve lvl meta spine vt = do
+solve lvl meta spine t = do
   renaming <- invert lvl spine
-  t <- rename meta renaming vt
+  t <- rename meta renaming t
   solution <-
     eval Env.empty . flipfoldl' ($) t $
       replicate (renaming ^. #source % coerced) (Lam "x")
@@ -99,14 +99,14 @@ unify lvl = go
   go =
     curry $
       traverseOf both forceValue >=> \case
-        (V.Neut x spine0, V.Neut x' spine0')
+        (V.Neut x spine, V.Neut x' spine')
           | x == x' ->
             let goSpine = curry \case
                   (V.Nil, V.Nil) -> pass
-                  (V.App spine vt, V.App spine' vt') ->
-                    goSpine spine spine' *> go vt vt'
-                  (V.RowExt vts spine, V.RowExt vts' spine')
-                    | Just ms <- MM.match go vts vts' -> do
+                  (V.App spine t, V.App spine' t') ->
+                    goSpine spine spine' *> go t t'
+                  (V.RowExt ts spine, V.RowExt ts' spine')
+                    | Just ms <- MM.match go ts ts' -> do
                       sequenceA_ ms
                       goSpine spine spine'
                   ( V.RecordProj label index spine
@@ -114,68 +114,67 @@ unify lvl = go
                     )
                       | label == label' && index == index' ->
                         goSpine spine spine'
-                  (V.RecordAlter vts spine, V.RecordAlter vts' spine')
-                    | Just ms <- MMA.match go vts vts' -> do
+                  (V.RecordAlter ts spine, V.RecordAlter ts' spine')
+                    | Just ms <- MMA.match go ts ts' -> do
                       sequenceA_ ms
                       goSpine spine spine'
                   (spine, spine') ->
                     throw $ Mismatch (V.Neut x spine) (V.Neut x' spine')
-             in goSpine spine0 spine0'
-        (V.Neut x (V.RowExt vts spine), V.Neut x' (V.RowExt vts' spine'))
-          | Just ms <- MM.match go vts vts' -> do
+             in goSpine spine spine'
+        (V.Neut x (V.RowExt ts spine), V.Neut x' (V.RowExt ts' spine'))
+          | Just ms <- MM.match go ts ts' -> do
             sequenceA_ ms
             go (V.Neut x spine) (V.Neut x' spine')
-        ( V.Neut (V.Flex mx) (V.RowExt vts spine)
-          , V.Neut x' (V.RowExt vts' spine')
+        ( V.Neut (V.Flex mx) (V.RowExt ts spine)
+          , V.Neut x' (V.RowExt ts' spine')
           )
-            | Just vts'' <- MM.superDifference vts' vts ->
-              solve lvl mx spine $ V.Neut x' (V.RowExt vts'' spine')
-        ( V.Neut x (V.RowExt vts spine)
-          , V.Neut (V.Flex mx') (V.RowExt vts' spine')
+            | Just ts' <- MM.superDifference ts' ts ->
+              solve lvl mx spine $ V.Neut x' (V.RowExt ts' spine')
+        ( V.Neut x (V.RowExt ts spine)
+          , V.Neut (V.Flex mx') (V.RowExt ts' spine')
           )
-            | Just vts'' <- MM.superDifference vts vts' ->
-              solve lvl mx' spine' $
-                V.Neut x (V.RowExt vts'' spine)
-        ( V.Neut (V.Flex mx) (V.RowExt vts spine)
-          , V.Neut (V.Flex mx') (V.RowExt vts' spine')
+            | Just ts <- MM.superDifference ts ts' ->
+              solve lvl mx' spine' $ V.Neut x (V.RowExt ts spine)
+        ( V.Neut (V.Flex mx) (V.RowExt ts spine)
+          , V.Neut (V.Flex mx') (V.RowExt ts' spine')
           ) -> do
-            mx'' <- freshMeta
+            mnew <- freshMeta
             solve lvl mx spine $
-              V.Neut (V.Flex mx'') (V.RowExt (MM.difference vts' vts) spine')
+              V.Neut (V.Flex mnew) (V.RowExt (MM.difference ts' ts) spine')
             solve lvl mx' spine' $
-              V.Neut (V.Flex mx'') (V.RowExt (MM.difference vts vts') spine)
-        (V.Neut (V.Flex mx) (V.RowExt vts spine), V.RowLit vts') ->
-          solve lvl mx spine $ V.RowLit (MM.difference vts' vts)
-        (V.RowLit vts, V.Neut (V.Flex mx) (V.RowExt vts' spine)) ->
-          solve lvl mx spine $ V.RowLit (MM.difference vts vts')
-        (V.Neut (V.Flex mx) spine, vt) -> solve lvl mx spine vt
-        (vt, V.Neut (V.Flex mx) spine) -> solve lvl mx spine vt
+              V.Neut (V.Flex mnew) (V.RowExt (MM.difference ts ts') spine)
+        (V.Neut (V.Flex mx) (V.RowExt ts spine), V.RowLit ts') ->
+          solve lvl mx spine $ V.RowLit (MM.difference ts' ts)
+        (V.RowLit ts, V.Neut (V.Flex mx) (V.RowExt ts' spine)) ->
+          solve lvl mx spine $ V.RowLit (MM.difference ts ts')
+        (V.Neut (V.Flex mx) spine, t) -> solve lvl mx spine t
+        (t, V.Neut (V.Flex mx) spine) -> solve lvl mx spine t
         (V.U, V.U) -> pass
-        (V.Pi _ va closure, V.Pi _ va' closure') -> do
-          go va va'
-          vb <- openClosure lvl closure
-          vb' <- openClosure lvl closure'
-          unify (lvl + 1) vb vb'
+        (V.Pi _ a closure, V.Pi _ a' closure') -> do
+          go a a'
+          b <- openClosure lvl closure
+          b' <- openClosure lvl closure'
+          unify (lvl + 1) b b'
         (V.Lam _ closure, V.Lam _ closure') -> do
-          vt <- openClosure lvl closure
-          vt' <- openClosure lvl closure'
-          unify (lvl + 1) vt vt'
+          t <- openClosure lvl closure
+          t' <- openClosure lvl closure'
+          unify (lvl + 1) t t'
         (V.Lam _ closure, V.Neut x spine) -> do
-          vt <- openClosure lvl closure
-          unify (lvl + 1) vt (V.Neut x $ V.App spine (V.var lvl))
+          t <- openClosure lvl closure
+          unify (lvl + 1) t (V.Neut x $ V.App spine (V.var lvl))
         (V.Neut x spine, V.Lam _ closure) -> do
-          vt <- openClosure lvl closure
-          unify (lvl + 1) (V.Neut x $ V.App spine (V.var lvl)) vt
-        (V.RowType va, V.RowType va') -> go va va'
-        (V.RowLit vts, V.RowLit vts')
-          | Just ms <- MM.match go vts vts' ->
+          t <- openClosure lvl closure
+          unify (lvl + 1) (V.Neut x $ V.App spine (V.var lvl)) t
+        (V.RowType a, V.RowType a') -> go a a'
+        (V.RowLit ts, V.RowLit ts')
+          | Just ms <- MM.match go ts ts' ->
             sequenceA_ ms
         (V.RecordType va, V.RecordType va') -> go va va'
-        (V.RecordLit vts, V.RecordLit vts')
-          | Just ms <- MM.match go vts vts' ->
+        (V.RecordLit ts, V.RecordLit ts')
+          | Just ms <- MM.match go ts ts' ->
             sequenceA_ ms
-        (V.RecordLit vts, vt'@V.Neut{}) ->
-          ifor_ vts \(label, index) vt -> go vt (V.recordProj label index vt')
-        (vt@V.Neut{}, V.RecordLit vts') ->
-          ifor_ vts' \(label, index) vt' -> go (V.recordProj label index vt') vt
-        (vt, vt') -> throw $ Mismatch vt vt'
+        (V.RecordLit ts, t'@V.Neut{}) ->
+          ifor_ ts \(label, index) t -> go t (V.recordProj label index t')
+        (t@V.Neut{}, V.RecordLit ts') ->
+          ifor_ ts' \(label, index) t' -> go (V.recordProj label index t') t
+        (t, t') -> throw $ Mismatch t t'

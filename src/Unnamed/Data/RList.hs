@@ -36,13 +36,13 @@ empty :: RList a
 empty = RList 0 TNil
 
 cons :: a -> RList a -> RList a
-cons x (RList s ts0) = RList (s + 1) case ts0 of
+cons x (RList s ts) = RList (s + 1) case ts of
   TCons w1 t1 (TCons w2 t2 ts)
     | w1 == w2 -> TCons (1 + w1 + w2) (Node x t1 t2) ts
-  ts -> TCons 1 (Leaf x) ts
+  _ -> TCons 1 (Leaf x) ts
 
 uncons :: RList a -> Maybe (a, RList a)
-uncons (RList s ts0) = case ts0 of
+uncons (RList s ts) = case ts of
   TNil -> Nothing
   TCons w t ts -> case t of
     Leaf x -> Just (x, RList (s - 1) ts)
@@ -60,25 +60,25 @@ type instance Index (RList a) = Int
 type instance IxValue (RList a) = a
 
 ixTree :: Int -> Int -> AffineTraversal' (Tree a) a
-ixTree i0 w0 = atraversalVL \pure' f ->
+ixTree i w = atraversalVL \pure f ->
   let go i w = \case
         Leaf x
           | i == 0 -> Leaf <$> f x
-          | otherwise -> pure' $ Leaf x
+          | otherwise -> pure $ Leaf x
         Node x t1 t2
-          | i == 0 -> f x <&> \x' -> Node x' t1 t2
-          | i <= hw -> go (i - 1) hw t1 <&> \t1' -> Node x t1' t2
-          | otherwise -> go (i - 1 - hw) hw t2 <&> \t2' -> Node x t1 t2'
+          | i == 0 -> f x <&> \x -> Node x t1 t2
+          | i <= hw -> go (i - 1) hw t1 <&> \t1 -> Node x t1 t2
+          | otherwise -> go (i - 1 - hw) hw t2 <&> \t2 -> Node x t1 t2
        where
         hw = w `div` 2
-   in go i0 w0
+   in go i w
 
 instance Ixed (RList a) where
-  ix i0 = atraversalVL \pure' f (RList s ts0) ->
+  ix i = atraversalVL \pure f (RList s ts) ->
     let go i = \case
-          TNil -> pure' TNil
+          TNil -> pure TNil
           TCons w t ts
             | i < w ->
-              t & atraverseOf (ixTree i w) pure' f <&> \t' -> TCons w t' ts
+              t & atraverseOf (ixTree i w) pure f <&> \t -> TCons w t ts
             | otherwise -> TCons w t <$> go (i - w) ts
-     in RList s <$> go i0 ts0
+     in RList s <$> go i ts

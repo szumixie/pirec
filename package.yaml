@@ -18,6 +18,7 @@ ghc-options:
   - -Wmissing-deriving-strategies
   - -Wprepositive-qualified-module
 
+  - -Wno-name-shadowing
   - -fplugin=Control.Effect.Plugin
 
 default-extensions:
@@ -182,6 +183,7 @@ when:
       - -ddump-to-file
       - -dumpdir=.dumps
       - -ddump-simpl
+
       - -dppr-case-as-let
       - -dsuppress-uniques
       - -dsuppress-idinfo

@@ -59,17 +59,17 @@ instance ShowErrorComponent CompElabError where
     renderString . layoutPretty defaultLayoutOptions . run $ runMetaLookup
       mlookup
       case err of
-        UnifyError va va' uerr -> do
+        UnifyError a a' uerr -> do
           puerr <- prettyUnifyError ctx uerr
-          pa <- prettyValue ctx va
-          pa' <- prettyValue ctx va'
+          a <- prettyValue ctx a
+          a' <- prettyValue ctx a'
           pure $
             vsep
               [ puerr
               , "when unifying expected type:"
-              , pa
+              , a
               , "with inferred type:"
-              , pa'
+              , a'
               ]
         ScopeError x -> pure $ "variable" <+> pretty x <+> "out of scope"
         DupField label -> pure $ "duplicate field" <+> pretty label <+> "in row"
@@ -85,9 +85,9 @@ instance ShowErrorComponent CompElabError where
               , "but got record with fields:"
               , hsep $ pretty <$> toList tset
               ]
-        FieldExpected label va -> do
-          pa <- prettyValue ctx va
-          pure $ "expected field" <+> pretty label <+> "in type:" <> line <> pa
+        FieldExpected label a -> do
+          a <- prettyValue ctx a
+          pure $ "expected field" <+> pretty label <+> "in type:" <> line <> a
   errorComponentLen err = end - start
    where
     Span start end = err ^. #error % #context % #span

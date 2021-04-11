@@ -37,12 +37,12 @@ main = withUtf8 do
     Right raw -> pure raw
     Left err -> hPutStr stderr (MP.errorBundlePretty err) *> exitFailure
   runM $ metaCtxToIO do
-    (t, va) <-
+    (t, a) <-
       errorToIO (infer Ctx.empty raw) >>= \case
         Right tva -> pure tva
         Left err -> do
           perr <- prettyElabError err fp input
           embed $ hPutStr stderr perr *> exitFailure
-    t' <- normal t
-    pa <- prettyValue Ctx.empty va
-    embed . PP.putDoc $ prettyTerm t' <> PP.line <> PP.colon <+> pa
+    t <- normal t
+    a <- prettyValue Ctx.empty a
+    embed . PP.putDoc $ prettyTerm t <> PP.line <> PP.colon <+> a

@@ -30,19 +30,19 @@ empty :: Context
 empty = Context (Span 0 0) 0 Env.empty mempty BM.empty
 
 extend :: Name -> Value -> Value -> Context -> Context
-extend x va vt (Context sp lvl env names mask) =
+extend x a t (Context sp lvl env names mask) =
   Context
     sp
     (lvl + 1)
-    (env & Env.extend vt)
-    (names & at x ?~ (lvl, va))
+    (env & Env.extend t)
+    (names & at x ?~ (lvl, a))
     mask
 
 bind :: Name -> Value -> Context -> Context
-bind x va (Context sp lvl env names mask) =
+bind x a (Context sp lvl env names mask) =
   Context
     sp
     (lvl + 1)
     (env & Env.extend (V.var lvl))
-    (names & at x ?~ (lvl, va))
+    (names & at x ?~ (lvl, a))
     (mask & BM.extend lvl)

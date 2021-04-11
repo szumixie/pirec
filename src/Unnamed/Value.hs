@@ -57,28 +57,28 @@ meta :: Meta -> Value
 meta mx = Neut (Flex mx) Nil
 
 rowExt :: MultiMap Name Value -> Value -> Value
-rowExt vts = \case
-  Neut x spine0 -> Neut x case spine0 of
-    RowExt vus spine -> RowExt (vts <> vus) spine
-    spine -> RowExt vts spine
-  RowLit vus -> RowLit (vts <> vus)
+rowExt ts = \case
+  Neut x spine -> Neut x case spine of
+    RowExt us spine -> RowExt (ts <> us) spine
+    _ -> RowExt ts spine
+  RowLit us -> RowLit (ts <> us)
   _ -> error "bug"
 
 recordProj :: Name -> Int -> Value -> Value
 recordProj label index = \case
-  Neut x spine0 -> case spine0 of
-    RecordAlter vts spine -> case vts & MMA.lookup label index of
-      Left index' -> Neut x $ RecordProj label index' spine
-      Right vt -> vt
-    spine -> Neut x $ RecordProj label index spine
-  RecordLit vts -> vts ^? ix (label, index) ?: error "bug"
+  Neut x spine -> case spine of
+    RecordAlter ts spine -> case ts & MMA.lookup label index of
+      Left index -> Neut x $ RecordProj label index spine
+      Right t -> t
+    _ -> Neut x $ RecordProj label index spine
+  RecordLit ts -> ts ^? ix (label, index) ?: error "bug"
   _ -> error "bug"
 
 recordAlter :: MultiMapAlter Name Value -> Value -> Value
-recordAlter vts = \case
-  Neut x spine0 -> Neut x case spine0 of
-    RecordAlter vus spine ->
-      maybe id RecordAlter (guarded (not . null) (vts <> vus)) spine
-    spine -> RecordAlter vts spine
-  RecordLit vus -> RecordLit (MMA.apply vts vus)
+recordAlter ts = \case
+  Neut x spine -> Neut x case spine of
+    RecordAlter us spine ->
+      maybe id RecordAlter (guarded (not . null) (ts <> us)) spine
+    _ -> RecordAlter ts spine
+  RecordLit us -> RecordLit (MMA.apply ts us)
   _ -> error "bug"

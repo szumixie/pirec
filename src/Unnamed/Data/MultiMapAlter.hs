@@ -38,7 +38,7 @@ elemInsert :: Seq a -> ElemAlter a
 elemInsert = ElemAlter 0
 
 elemDelete :: Int -> ElemAlter a
-elemDelete = (`ElemAlter` mempty)
+elemDelete i = ElemAlter i mempty
 
 elemDrop :: Int -> Seq a -> ElemAlter a
 elemDrop i xs = case i `compare` length xs of
@@ -76,8 +76,8 @@ apply (MultiMapAlter mx) (MultiMap my) =
       These (ElemAlter i xs) ys -> guarded (not . null) (xs <> Seq.drop i ys)
 
 lookup :: (Eq k, Hashable k) => k -> Int -> MultiMapAlter k a -> Either Int a
-lookup k i (MultiMapAlter mx) =
-  mx & views (at k) \case
+lookup k i (MultiMapAlter m) =
+  m & views (at k) \case
     Nothing -> Left i
     Just (ElemAlter j xs) -> xs ^? ix i & maybeToRight (i - length xs + j)
 

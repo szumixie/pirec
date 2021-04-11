@@ -25,18 +25,18 @@ import Unnamed.Var.Meta (Meta)
 import Unnamed.Effect.Meta
 
 eval :: Eff MetaLookup m => Env Value -> Term -> m Value
-eval env0 t0 = do
+eval env t = do
   mlookup <- metaLookup
   let goEnv !env = go
        where
         go = \case
           Var lx -> env & Env.index lx ?: error "bug"
           Meta mx mmask ->
-            let vt = mlookup mx ?: V.meta mx
+            let t = mlookup mx ?: V.meta mx
              in case mmask of
-                  Nothing -> vt
+                  Nothing -> t
                   Just mask ->
-                    env & foldlOf' (BM.masked mask) (appValuePure mlookup) vt
+                    env & foldlOf' (BM.masked mask) (appValuePure mlookup) t
           Let _ t u -> goEnv (env & Env.extend (go t)) u
           U -> V.U
           Pi x a b -> V.Pi x (go a) (V.Closure env b)
@@ -49,57 +49,57 @@ eval env0 t0 = do
           RecordLit ts -> V.RecordLit (go <$> ts)
           RecordProj label index t -> V.recordProj label index (go t)
           RecordAlter ts u -> V.recordAlter (go <$> ts) (go u)
-  pure $ goEnv env0 t0
+  pure $ goEnv env t
 
 appClosure :: Eff MetaLookup m => Closure -> Value -> m Value
-appClosure (V.Closure env t) vu = eval (env & Env.extend vu) t
+appClosure (V.Closure env t) u = eval (env & Env.extend u) t
 
 appValue :: Eff MetaLookup m => Value -> Value -> m Value
-appValue vt vu = case vt of
-  V.Neut x spine -> pure $ V.Neut x (V.App spine vu)
-  V.Lam _ closure -> appClosure closure vu
+appValue t u = case t of
+  V.Neut x spine -> pure $ V.Neut x (V.App spine u)
+  V.Lam _ closure -> appClosure closure u
   _ -> error "bug"
 
 appValuePure :: (Meta -> Maybe Value) -> Value -> Value -> Value
-appValuePure mlookup vt vu = run $ runMetaLookup mlookup (appValue vt vu)
+appValuePure mlookup t u = run $ runMetaLookup mlookup (appValue t u)
 
 appSpine :: Eff MetaLookup m => Value -> Spine -> m Value
-appSpine vt = go
+appSpine t = go
  where
   go = \case
-    V.Nil -> pure vt
-    V.App spine vu -> go spine >>= (`appValue` vu)
-    V.RowExt vus spine -> V.rowExt vus <$> go spine
+    V.Nil -> pure t
+    V.App spine u -> go spine >>= (`appValue` u)
+    V.RowExt us spine -> V.rowExt us <$> go spine
     V.RecordProj label index spine -> V.recordProj label index <$> go spine
-    V.RecordAlter vus spine -> V.recordAlter vus <$> go spine
+    V.RecordAlter us spine -> V.recordAlter us <$> go spine
 
 forceValue :: Eff MetaLookup m => Value -> m Value
-forceValue vt0 = case vt0 of
+forceValue t = case t of
   V.Neut (V.Flex mx) spine ->
     metaLookup ?? mx >>= \case
-      Just vt -> appSpine vt spine >>= forceValue
-      Nothing -> pure vt0
-  vt -> pure vt
+      Just t -> appSpine t spine >>= forceValue
+      Nothing -> pure t
+  _ -> pure t
 
 quote :: Eff MetaLookup m => Level -> Value -> m Term
 quote !lvl = go
  where
   go =
     forceValue >=> \case
-      V.Neut x spine0 ->
+      V.Neut x spine ->
         let goSpine = \case
               V.Nil -> pure case x of
                 V.Rigid lx -> Var lx
                 V.Flex mx -> Meta mx Nothing
-              V.App spine vt ->
-                App <$> goSpine spine <*> go vt
-              V.RowExt vts spine ->
-                RowExt <$> traverse go vts <*> goSpine spine
+              V.App spine t ->
+                App <$> goSpine spine <*> go t
+              V.RowExt ts spine ->
+                RowExt <$> traverse go ts <*> goSpine spine
               V.RecordProj label index spine ->
                 RecordProj label index <$> goSpine spine
-              V.RecordAlter vts spine ->
-                RecordAlter <$> traverse go vts <*> goSpine spine
-         in goSpine spine0
+              V.RecordAlter ts spine ->
+                RecordAlter <$> traverse go ts <*> goSpine spine
+         in goSpine spine
       V.U -> pure U
       V.Pi x a closure -> Pi x <$> go a <*> quoteClosure lvl closure
       V.Lam x closure -> Lam x <$> quoteClosure lvl closure

@@ -65,7 +65,7 @@ metaCtxToIO m = do
         FreshMeta -> embed do
           next <- readRef nextRef
           Meta next <$ writeRef nextRef (next + 1)
-        SolveMeta meta vt -> embed $ HT.insert solveds meta vt
+        SolveMeta meta t -> embed $ HT.insert solveds meta t
     )
     $ interpret
       \case
