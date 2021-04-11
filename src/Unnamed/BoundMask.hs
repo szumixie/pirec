@@ -18,3 +18,4 @@ extend (Level i) s = s & coercedTo @IntSet % contains i .~ True
 
 masked :: BoundMask -> IxFold Level (Env a) a
 masked (BoundMask s) = ifolded %& ifiltered \(Level i) _ -> s ^. contains i
+{-# INLINE masked #-}

@@ -34,7 +34,7 @@ eval env t = do
           Meta mx mmask -> case mmask of
             Nothing -> t
             Just mask ->
-              env & foldlOf' (BM.masked mask) (appValuePure mlookup) t
+              env & foldrOf (BM.masked mask) (flip $ appValuePure mlookup) t
            where
             t = mlookup mx ?: V.meta mx
           Let _ t u -> goEnv (env & Env.extend (go t)) u

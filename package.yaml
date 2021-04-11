@@ -100,8 +100,8 @@ dependencies:
   - optics
   - these-optics
 
-  - transformers
   - mtl
+  - transformers
   - in-other-words
   - in-other-words-plugin
 
@@ -183,6 +183,7 @@ when:
       - -ddump-to-file
       - -dumpdir=.dumps
       - -ddump-simpl
+      - -ddump-hi
 
       - -dppr-case-as-let
       - -dsuppress-uniques
