@@ -46,7 +46,7 @@ checkInfer ::
   Effs [MetaCtx, Throw ElabError] m =>
   Context ->
   (R.Term -> Value -> m Term, R.Term -> m (Term, Value))
-checkInfer ctx = (goCheck, goInfer)
+checkInfer !ctx = (goCheck, goInfer)
  where
   goCheck = curry \case
     (R.Span span t, a) -> check (ctx & #span .~ span) t a

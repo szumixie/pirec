@@ -74,7 +74,7 @@ solve lvl meta spine t = do
   solveMeta meta solution
 
 unify :: Effs [MetaCtx, Throw UnifyError] m => Level -> Value -> Value -> m ()
-unify lvl = go
+unify !lvl = go
  where
   go =
     curry $
