@@ -12,7 +12,7 @@ import Optics
 import Prettyprinter.Render.String (renderString)
 import Text.Megaparsec hiding (label)
 
-import Unnamed.Data.Span (Span (Span))
+import Unnamed.Data.Span qualified as Span
 import Unnamed.Value (Value)
 import Unnamed.Var.Meta (Meta)
 import Unnamed.Var.Name (Name)
@@ -68,9 +68,7 @@ instance ShowErrorComponent CompElabError where
               , a'
               ]
         ScopeError x -> pure $ "variable" <+> pretty x <+> "out of scope"
-  errorComponentLen err = end - start
-   where
-    Span start end = err ^. #error % #context % #span
+  errorComponentLen = view $ #error % #context % #span % Span.length
 
 prettyElabError :: Eff MetaLookup m => ElabError -> FilePath -> Text -> m String
 prettyElabError err fp input = do

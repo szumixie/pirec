@@ -1,6 +1,6 @@
-module Unnamed.Data.Span (Span (..)) where
+module Unnamed.Data.Span (Span (..), length) where
 
-import Relude
+import Relude hiding (length)
 
 import Optics
 
@@ -12,3 +12,7 @@ declareFieldLabels
       }
       deriving stock (Show)
     |]
+
+length :: Lens' Span Int
+length = lensVL \f (Span start end) ->
+  Span start . (+ start) <$> f (end - start)
