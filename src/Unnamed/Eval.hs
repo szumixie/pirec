@@ -2,6 +2,7 @@ module Unnamed.Eval (
   eval,
   appClosure,
   forceValue,
+  quoteWith,
   quote,
   openClosure,
   closeValue,
@@ -81,35 +82,46 @@ forceValue t = case t of
       Nothing -> pure t
   _ -> pure t
 
-quote :: Eff MetaLookup m => Level -> Value -> m Term
-quote !lvl = go
+quoteWith ::
+  Eff MetaLookup m =>
+  (a -> V.Var -> m Term) ->
+  (Level -> a -> a) ->
+  a ->
+  Level ->
+  Value ->
+  m Term
+quoteWith quoteVar f = goAcc
  where
-  go =
-    forceValue >=> \case
-      V.Neut x spine -> goSpine spine
-       where
-        goSpine = \case
-          V.Nil -> pure case x of
-            V.Rigid lx -> Var lx
-            V.Flex mx -> Meta mx Nothing
-          V.App spine t ->
-            App <$> goSpine spine <*> go t
-          V.RowExt ts spine ->
-            RowExt <$> traverse go ts <*> goSpine spine
-          V.RecordProj label index spine ->
-            RecordProj label index <$> goSpine spine
-          V.RecordAlter ts spine ->
-            RecordAlter <$> traverse go ts <*> goSpine spine
-      V.U -> pure U
-      V.Pi x a closure -> Pi x <$> go a <*> quoteClosure lvl closure
-      V.Lam x closure -> Lam x <$> quoteClosure lvl closure
-      V.RowType a -> RowType <$> go a
-      V.RowLit ts -> RowLit <$> traverse go ts
-      V.RecordType row -> RecordType <$> go row
-      V.RecordLit ts -> RecordLit <$> traverse go ts
+  goAcc !acc !lvl = go
+   where
+    go =
+      forceValue >=> \case
+        V.Neut x spine -> do
+          x <- quoteVar acc x
+          let goSpine = \case
+                V.Nil -> pure x
+                V.App spine t -> App <$> goSpine spine <*> go t
+                V.RowExt ts spine -> RowExt <$> traverse go ts <*> goSpine spine
+                V.RecordProj label index spine ->
+                  RecordProj label index <$> goSpine spine
+                V.RecordAlter ts spine ->
+                  RecordAlter <$> traverse go ts <*> goSpine spine
+          goSpine spine
+        V.U -> pure U
+        V.Pi x a closure -> Pi x <$> go a <*> goClosure closure
+        V.Lam x closure -> Lam x <$> goClosure closure
+        V.RowType a -> RowType <$> go a
+        V.RowLit ts -> RowLit <$> traverse go ts
+        V.RecordType row -> RecordType <$> go row
+        V.RecordLit ts -> RecordLit <$> traverse go ts
+    goClosure closure = goAcc (f lvl acc) (lvl + 1) =<< openClosure lvl closure
 
-quoteClosure :: Eff MetaLookup m => Level -> Closure -> m Term
-quoteClosure lvl = quote (lvl + 1) <=< openClosure lvl
+quote :: Eff MetaLookup m => Level -> Value -> m Term
+quote = quoteWith go (\_ _ -> ()) ()
+ where
+  go _ x = pure case x of
+    V.Rigid lx -> Var lx
+    V.Flex mx -> Meta mx Nothing
 
 openClosure :: Eff MetaLookup m => Level -> Closure -> m Value
 openClosure lvl closure = appClosure closure (V.var lvl)

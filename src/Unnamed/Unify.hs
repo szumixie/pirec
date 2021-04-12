@@ -23,71 +23,51 @@ declareFieldLabels
   [d|
     data Renaming = Renaming
       { source :: {-# UNPACK #-} Level
-      , target :: {-# UNPACK #-} Level
       , map :: HashMap Level Level
       }
       deriving stock (Show)
     |]
 
-liftRenaming :: Renaming -> Renaming
-liftRenaming (Renaming src tgt m) =
-  Renaming (src + 1) (tgt + 1) (m & at tgt ?!~ src)
+liftRenaming :: Level -> Renaming -> Renaming
+liftRenaming tgt (Renaming src m) =
+  Renaming (src + 1) (m & at tgt ?!~ src)
 
-invert :: Effs [MetaLookup, Throw UnifyError] m => Level -> Spine -> m Renaming
-invert lvl = go >>> fmap \(src, m) -> Renaming src lvl m
+invert :: Effs [MetaLookup, Throw UnifyError] m => Spine -> m Renaming
+invert = go
  where
   go = \case
-    V.Nil -> pure (0, mempty)
+    V.Nil -> pure $ Renaming 0 mempty
     V.App spine t -> do
-      (src, m) <- go spine
+      Renaming src m <- go spine
       forceValue t >>= \case
         V.Neut (V.Rigid lx) V.Nil
           | Just _ <- m ^. at lx -> throw $ Nonlinear lx
-          | otherwise -> pure (src + 1, m & at lx ?!~ src)
+          | otherwise -> pure $ Renaming (src + 1) (m & at lx ?!~ src)
         t -> throw $ Nonvariable t
     _ -> throw NonInvertable
 
 rename ::
-  Effs [MetaLookup, Throw UnifyError] m => Meta -> Renaming -> Value -> m Term
-rename meta = goRenaming
+  Effs [MetaLookup, Throw UnifyError] m =>
+  Meta ->
+  Renaming ->
+  Level ->
+  Value ->
+  m Term
+rename meta = quoteWith go liftRenaming
  where
-  goRenaming renaming@(Renaming _ tgt m) = go
-   where
-    go =
-      forceValue >=> \case
-        V.Neut x spine -> goSpine spine
-         where
-          goSpine = \case
-            V.Nil -> case x of
-              V.Rigid lx -> case m ^. at lx of
-                Nothing -> throw $ ScopeError lx
-                Just lx -> pure $ Var lx
-              V.Flex mx
-                | mx == meta -> throw $ OccursError meta
-                | otherwise -> pure $ Meta mx Nothing
-            V.App spine t ->
-              App <$> goSpine spine <*> go t
-            V.RowExt ts spine ->
-              RowExt <$> traverse go ts <*> goSpine spine
-            V.RecordProj label index spine ->
-              RecordProj label index <$> goSpine spine
-            V.RecordAlter ts spine ->
-              RecordAlter <$> traverse go ts <*> goSpine spine
-        V.U -> pure U
-        V.Pi x a closure -> Pi x <$> go a <*> goClosure closure
-        V.Lam x closure -> Lam x <$> goClosure closure
-        V.RowType a -> RowType <$> go a
-        V.RowLit ts -> RowLit <$> traverse go ts
-        V.RecordType r -> RecordType <$> go r
-        V.RecordLit ts -> RecordLit <$> traverse go ts
-    goClosure closure =
-      goRenaming (liftRenaming renaming) =<< openClosure tgt closure
+  go (Renaming _ m) = \case
+    V.Rigid lx -> case m ^. at lx of
+      Nothing -> throw $ ScopeError lx
+      Just lx -> pure $ Var lx
+    V.Flex mx
+      | mx == meta -> throw $ OccursError meta
+      | otherwise -> pure $ Meta mx Nothing
 
 solve ::
   Effs [MetaCtx, Throw UnifyError] m => Level -> Meta -> Spine -> Value -> m ()
 solve lvl meta spine t = do
-  renaming <- invert lvl spine
-  t <- rename meta renaming t
+  renaming <- invert spine
+  t <- rename meta renaming lvl t
   solution <-
     eval Env.empty . flipfoldl' ($) t $
       replicate (renaming ^. #source % coerced) (Lam "x")
