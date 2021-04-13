@@ -18,33 +18,8 @@ import Unnamed.Var.Meta (Meta)
 import Unnamed.Effect.Meta
 import Unnamed.Eval
 import Unnamed.Unify.Error
-
-declareFieldLabels
-  [d|
-    data Renaming = Renaming
-      { source :: {-# UNPACK #-} Level
-      , map :: HashMap Level Level
-      }
-      deriving stock (Show)
-    |]
-
-liftRenaming :: Level -> Renaming -> Renaming
-liftRenaming tgt (Renaming src m) =
-  Renaming (src + 1) (m & at tgt ?!~ src)
-
-invert :: Effs [MetaLookup, Throw UnifyError] m => Spine -> m Renaming
-invert = go
- where
-  go = \case
-    V.Nil -> pure $ Renaming 0 mempty
-    V.App spine t -> do
-      Renaming src m <- go spine
-      forceValue t >>= \case
-        V.Neut (V.Rigid lx) V.Nil
-          | Just _ <- m ^. at lx -> throw $ Nonlinear lx
-          | otherwise -> pure $ Renaming (src + 1) (m & at lx ?!~ src)
-        t -> throw $ Nonvariable t
-    _ -> throw NonInvertable
+import Unnamed.Unify.Renaming (Renaming)
+import Unnamed.Unify.Renaming qualified as Renaming
 
 rename ::
   Effs [MetaLookup, Throw UnifyError] m =>
@@ -53,10 +28,10 @@ rename ::
   Level ->
   Value ->
   m Term
-rename meta = quoteWith go liftRenaming
+rename meta = quoteWith go Renaming.lift
  where
-  go (Renaming _ m) = \case
-    V.Rigid lx -> case m ^. at lx of
+  go renaming = \case
+    V.Rigid lx -> case renaming & Renaming.rename lx of
       Nothing -> throw $ ScopeError lx
       Just lx -> pure $ Var lx
     V.Flex mx
@@ -66,11 +41,11 @@ rename meta = quoteWith go liftRenaming
 solve ::
   Effs [MetaCtx, Throw UnifyError] m => Level -> Meta -> Spine -> Value -> m ()
 solve lvl meta spine t = do
-  renaming <- invert spine
+  renaming <- Renaming.invert spine
   t <- rename meta renaming lvl t
   solution <-
     eval Env.empty . flipfoldl' ($) t $
-      replicate (renaming ^. #source % coerced) (Lam "x")
+      replicate (coerce $ Renaming.size renaming) (Lam "x")
   solveMeta meta solution
 
 unify :: Effs [MetaCtx, Throw UnifyError] m => Level -> Value -> Value -> m ()
