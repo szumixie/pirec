@@ -3,6 +3,7 @@ module Unnamed.Data.RList (RList, empty, cons, uncons) where
 import Relude hiding (empty, uncons)
 
 import Data.Traversable (fmapDefault, foldMapDefault)
+import GHC.Exts qualified
 import Text.Show
 
 import Optics hiding (cons, uncons)
@@ -128,6 +129,11 @@ instance AsEmpty (RList a) where
 
 instance Cons (RList a) (RList b) a b where
   _Cons = prism (uncurry cons) (uncons >>> maybeToRight empty)
+
+instance IsList (RList a) where
+  type Item (RList a) = a
+  fromList = foldr cons empty
+  toList = toList
 
 type instance Index (RList a) = Int
 type instance IxValue (RList a) = a
