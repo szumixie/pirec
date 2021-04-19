@@ -1,4 +1,4 @@
-module Unnamed.Data.RList (RList, empty, cons, uncons) where
+module Unnamed.Data.RList (RList, empty, cons, uncons, valid) where
 
 import Relude hiding (empty, uncons)
 
@@ -59,52 +59,21 @@ instance Foldable RList where
   length (RList s _) = s
   {-# INLINE length #-}
 
-itraverseTree ::
-  Applicative f => (Int -> a -> f b) -> Int -> Int -> Tree a -> f (Tree b)
-itraverseTree f = go
- where
-  go !i !w = \case
-    Leaf x -> Leaf <$> f i x
-    Node x t1 t2 ->
-      Node <$> f i x <*> go (i + 1) hw t1 <*> go (i + 1 + hw) hw t2
-     where
-      hw = w `div` 2
-{-# INLINEABLE itraverseTree #-}
-{-# SPECIALIZE itraverseTree ::
-  (Int -> a -> Identity b) -> Int -> Int -> Tree a -> Identity (Tree b)
-  #-}
-{-# SPECIALIZE itraverseTree ::
-  Monoid m =>
-  (Int -> a -> Const m b) ->
-  Int ->
-  Int ->
-  Tree a ->
-  Const m (Tree b)
-  #-}
+validTree :: Tree a -> Bool
+validTree = \case
+  Leaf _ -> True
+  Node _ l r -> length l == length r && validTree l && validTree r
 
-instance FunctorWithIndex Int RList where
-  imap :: forall a b. (Int -> a -> b) -> RList a -> RList b
-  imap = coerce $ itraverse @_ @RList @Identity @a @b
-  {-# INLINE imap #-}
+validTrees :: Int -> Trees a -> Bool
+validTrees pw = \case
+  TNil -> True
+  TCons w t ts -> pw < w && length t == w && validTree t && validTrees w ts
 
-instance FoldableWithIndex Int RList where
-  ifoldMap :: forall m a. Monoid m => (Int -> a -> m) -> RList a -> m
-  ifoldMap = coerce $ itraverse @_ @RList @(Const m) @a
-  {-# INLINE ifoldMap #-}
-
-instance TraversableWithIndex Int RList where
-  itraverse f (RList s ts) = RList s <$> go 0 ts
-   where
-    go !i = \case
-      TNil -> pure TNil
-      TCons w t ts -> TCons w <$> itraverseTree f i w t <*> go (i + w) ts
-  {-# INLINEABLE itraverse #-}
-  {-# SPECIALIZE itraverse ::
-    (Int -> a -> Identity b) -> RList a -> Identity (RList b)
-    #-}
-  {-# SPECIALIZE itraverse ::
-    Monoid m => (Int -> a -> Const m b) -> RList a -> Const m (RList b)
-    #-}
+valid :: RList a -> Bool
+valid (RList s ts) =
+  length ts == s && case ts of
+    TNil -> True
+    TCons w t ts -> length t == w && validTree t && validTrees (w - 1) ts
 
 empty :: RList a
 empty = RList 0 TNil
@@ -209,3 +178,50 @@ ixVL i pure f (RList s ts) = RList s <$> go i ts
 instance Ixed (RList a) where
   ix i = atraversalVL (ixVL i)
   {-# INLINE ix #-}
+
+itraverseTree ::
+  Applicative f => (Int -> a -> f b) -> Int -> Int -> Tree a -> f (Tree b)
+itraverseTree f = go
+ where
+  go !i !w = \case
+    Leaf x -> Leaf <$> f i x
+    Node x t1 t2 ->
+      Node <$> f i x <*> go (i + 1) hw t1 <*> go (i + 1 + hw) hw t2
+     where
+      hw = w `div` 2
+{-# INLINEABLE itraverseTree #-}
+{-# SPECIALIZE itraverseTree ::
+  (Int -> a -> Identity b) -> Int -> Int -> Tree a -> Identity (Tree b)
+  #-}
+{-# SPECIALIZE itraverseTree ::
+  Monoid m =>
+  (Int -> a -> Const m b) ->
+  Int ->
+  Int ->
+  Tree a ->
+  Const m (Tree b)
+  #-}
+
+instance FunctorWithIndex Int RList where
+  imap :: forall a b. (Int -> a -> b) -> RList a -> RList b
+  imap = coerce $ itraverse @_ @RList @Identity @a @b
+  {-# INLINE imap #-}
+
+instance FoldableWithIndex Int RList where
+  ifoldMap :: forall m a. Monoid m => (Int -> a -> m) -> RList a -> m
+  ifoldMap = coerce $ itraverse @_ @RList @(Const m) @a
+  {-# INLINE ifoldMap #-}
+
+instance TraversableWithIndex Int RList where
+  itraverse f (RList s ts) = RList s <$> go 0 ts
+   where
+    go !i = \case
+      TNil -> pure TNil
+      TCons w t ts -> TCons w <$> itraverseTree f i w t <*> go (i + w) ts
+  {-# INLINEABLE itraverse #-}
+  {-# SPECIALIZE itraverse ::
+    (Int -> a -> Identity b) -> RList a -> Identity (RList b)
+    #-}
+  {-# SPECIALIZE itraverse ::
+    Monoid m => (Int -> a -> Const m b) -> RList a -> Const m (RList b)
+    #-}
