@@ -1,5 +1,4 @@
-module Unnamed.Syntax.Raw.Lex (
-  Parser,
+module Unnamed.Syntax.Raw.Parse.Lex (
   spaceConsumer,
   lexeme,
   symbol,
@@ -31,13 +30,13 @@ import Data.Char (isAlphaNum)
 import Data.HashSet qualified as Set
 import Data.List.NonEmpty qualified as NE
 
+import Optics
 import Text.Megaparsec
 import Text.Megaparsec.Char (alphaNumChar, space1)
 import Text.Megaparsec.Char.Lexer qualified as L
 
+import Unnamed.Syntax.Raw.Parse.Type
 import Unnamed.Var.Name (Name, name)
-
-type Parser = StateT Int (Parsec Void Text)
 
 spaceConsumer :: Parser ()
 spaceConsumer =
@@ -46,7 +45,7 @@ spaceConsumer =
 lexeme :: Parser a -> Parser a
 lexeme p = do
   x <- p
-  put =<< getOffset
+  assign #lexemeEnd =<< getOffset
   x <$ spaceConsumer
 
 symbol :: Text -> Parser Text

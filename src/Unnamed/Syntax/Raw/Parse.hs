@@ -1,12 +1,14 @@
-module Unnamed.Syntax.Raw.Parse (Parser, parseRaw) where
+module Unnamed.Syntax.Raw.Parse (parseRaw) where
 
 import Relude hiding (many, some)
 
+import Optics
 import Text.Megaparsec
 
 import Unnamed.Data.Span
 import Unnamed.Syntax.Raw qualified as R
-import Unnamed.Syntax.Raw.Lex
+import Unnamed.Syntax.Raw.Parse.Lex
+import Unnamed.Syntax.Raw.Parse.Type
 
 data Level
   = LeftAssoc
@@ -19,7 +21,7 @@ data Level
       [Parser (R.Term -> R.Term)]
 
 parseRaw :: String -> Text -> Either (ParseErrorBundle Text Void) R.Term
-parseRaw = parse $ getOffset >>= evalStateT (spaceConsumer *> term <* eof)
+parseRaw = run $ spaceConsumer *> term <* eof
 
 term :: Parser R.Term
 term = foldl' addPrec (parens term <|> withSpan (choice atoms)) ops
@@ -46,7 +48,7 @@ withSpan :: Parser R.Term -> Parser R.Term
 withSpan p = do
   start <- getOffset
   x <- p
-  end <- get
+  end <- use #lexemeEnd
   pure $ R.Span (Span start end) x
 
 addPrec :: Parser R.Term -> Level -> Parser R.Term
@@ -57,12 +59,12 @@ addPrec p = \case
           choice
             [ do
                 f <- choice sf
-                end <- get
+                end <- use #lexemeEnd
                 go $ R.Span (Span start end) (f x)
             , do
                 f <- choice infl
                 y <- p
-                end <- get
+                end <- use #lexemeEnd
                 go $ R.Span (Span start end) (f x y)
             , pure x
             ]
