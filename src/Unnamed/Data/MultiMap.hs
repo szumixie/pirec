@@ -16,7 +16,7 @@ import Data.These.Optics
 import Optics
 
 newtype MultiMap k a = MultiMap (HashMap k (Seq a))
-  deriving newtype (Show, Monoid)
+  deriving newtype (Show)
   deriving stock (Functor, Foldable, Traversable)
   deriving
     (FunctorWithIndex (k, Int), FoldableWithIndex (k, Int), Semialign, Align)
@@ -28,6 +28,9 @@ instance TraversableWithIndex (k, Int) (MultiMap k) where
 
 instance (Eq k, Hashable k) => Semigroup (MultiMap k a) where
   MultiMap xs <> MultiMap ys = MultiMap $ M.unionWith (<>) xs ys
+
+instance (Eq k, Hashable k) => Monoid (MultiMap k a) where
+  mempty = MultiMap mempty
 
 instance Hashable k => One (MultiMap k a) where
   type OneItem (MultiMap k a) = (k, a)
