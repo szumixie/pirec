@@ -12,7 +12,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macOS-latest, windows-latest]
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
       - uses: actions/checkout@v2
@@ -35,8 +35,8 @@ jobs:
             ${{ runner.os }}-
 
       - name: Install dependencies
-        run: stack build --test --bench --no-run-tests --no-run-benchmarks --only-dependencies
+        run: stack build --flag unnamed:release --test --bench --no-run-tests --no-run-benchmarks --only-dependencies
       - name: Build
-        run: stack build --test --bench --no-run-tests --no-run-benchmarks
+        run: stack build --flag unnamed:release --test --bench --no-run-tests --no-run-benchmarks
       - name: Test
-        run: stack test
+        run: stack test --flag unnamed:release
