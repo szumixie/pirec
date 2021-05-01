@@ -1,71 +1,132 @@
 module Unnamed.Syntax.Raw.Parse.Lex (
-  spaceConsumer,
-  lexeme,
-  symbol,
-  keyword,
-  keywords,
+  space,
   ident,
+  binderIdent,
+  fieldLabel,
+  indentBlock,
   parens,
-  braces,
-  uscore,
-  equals,
   semicolon,
-  arrow,
-  colon,
-  lambda,
-  comma,
-  pipe,
-  dot,
-  minus,
+  uscore,
   let_,
-  in_,
+  equals,
+  colon,
   univ,
-  row,
-  record,
+  arrow,
+  forall_,
+  lambda,
+  rowType,
+  rowLit,
+  pipe,
+  recordType,
+  recordLit,
+  dot,
+  dotminus,
+  coloneq,
 ) where
 
 import Relude hiding (many, some)
 
-import Data.Char (isAlphaNum)
-import Data.HashSet qualified as Set
-import Data.List.NonEmpty qualified as NE
+import Data.Char qualified as C
+import Data.EnumSet (EnumSet)
+import Data.EnumSet qualified as ESet
+import Data.HashSet qualified as HSet
 
 import Optics
 import Text.Megaparsec
-import Text.Megaparsec.Char (alphaNumChar, space1)
+import Text.Megaparsec.Char qualified as C
 import Text.Megaparsec.Char.Lexer qualified as L
 
 import Unnamed.Syntax.Raw.Parse.Type
 import Unnamed.Var.Name (Name, name)
 
-spaceConsumer :: Parser ()
-spaceConsumer =
-  L.space space1 (L.skipLineComment "--") (L.skipBlockCommentNested "{-" "-}")
+lineComment :: Parser ()
+lineComment = L.skipLineComment "--"
+
+blockComment :: Parser ()
+blockComment = do
+  _ <- chunk "{-"
+  skipManyTill (blockComment <|> void anySingle) (void (chunk "-}") <|> eof)
+
+space :: Parser ()
+space = L.space C.space1 lineComment blockComment
 
 lexeme :: Parser a -> Parser a
 lexeme p = do
+  lineStart <- use #lineStart
+  _ <- L.indentGuard pass (if lineStart then EQ else GT) =<< gview #blockIndent
   x <- p
   assign #lexemeEnd =<< getOffset
-  x <$ spaceConsumer
+  assign #lineStart False
+  x <$ space
 
 symbol :: Text -> Parser Text
 symbol = lexeme . chunk
 
-keyword :: Text -> Parser Text
-keyword kw = lexeme $ chunk kw <* notFollowedBy alphaNumChar
+specialChars :: EnumSet Char
+specialChars = ESet.fromList "(){};\\.\""
+
+isIdentLetter :: Char -> Bool
+isIdentLetter c
+  | C.isAlphaNum c || C.isMark c = True
+  | c `ESet.member` specialChars = False
+  | otherwise = C.isPunctuation c || C.isSymbol c
 
 keywords :: HashSet Text
-keywords = Set.fromList ["let", "in", "U", "Row", "Record"]
+keywords =
+  HSet.fromList
+    [ "_"
+    , "let"
+    , "="
+    , ":"
+    , "U"
+    , "→"
+    , "->"
+    , "∀"
+    , "forall"
+    , "λ"
+    , "Row"
+    , "#"
+    , "|"
+    , "Rec"
+    , "rec"
+    , ":="
+    ]
+
+keyword :: Text -> Parser Text
+keyword kw = lexeme $ chunk kw <* notFollowedBy (satisfy isIdentLetter)
 
 ident :: Parser Name
 ident = lexeme $ try do
   offset <- getOffset
-  text <- takeWhile1P (Just "identifier") isAlphaNum
-  if text `Set.member` keywords
+  text <- takeWhile1P (Just "identifier") isIdentLetter
+  if text `HSet.member` keywords
     then
       region (setErrorOffset offset) . label "identifier" $
-        unexpected (Tokens $ text & toString & NE.fromList)
+        unexpected (Tokens $ text & toString & fromList)
     else pure $ name text
+
+binderIdent :: Parser Name
+binderIdent = ident <|> name <$> uscore
+
+fieldLabel :: Parser Name
+fieldLabel =
+  choice
+    [ ident
+    , lexeme $
+        name . fromString <$ single '"' <*> manyTill L.charLiteral (single '"')
+    ]
+    <?> "field label"
+
+indentBlock :: (Parser () -> Parser a) -> Parser a
+indentBlock f =
+  choice
+    [ braces $ f (void semicolon) <* optional semicolon
+    , do
+        blockIndent <- L.indentLevel
+        local (#blockIndent .~ blockIndent) $
+          assign #lineStart True *> f (assign #lineStart True)
+    ]
+    <?> "indented block"
 
 parens :: Parser a -> Parser a
 parens = between (symbol "(") (symbol ")")
@@ -73,31 +134,38 @@ parens = between (symbol "(") (symbol ")")
 braces :: Parser a -> Parser a
 braces = between (symbol "{") (symbol "}")
 
-uscore
+semicolon
+  , uscore
+  , let_
   , equals
-  , semicolon
-  , arrow
   , colon
+  , univ
+  , arrow
+  , forall_
   , lambda
-  , comma
+  , rowType
+  , rowLit
   , pipe
+  , recordType
+  , recordLit
   , dot
-  , minus ::
+  , dotminus
+  , coloneq ::
     Parser Text
-uscore = symbol "_"
-equals = symbol "="
 semicolon = symbol ";"
-arrow = symbol "->"
-colon = symbol ":"
-lambda = symbol "\\"
-comma = symbol ","
-pipe = symbol "|"
-dot = symbol "."
-minus = symbol "-"
-
-let_, in_, univ, row, record :: Parser Text
+uscore = keyword "_"
 let_ = keyword "let"
-in_ = keyword "in"
+equals = keyword "="
+colon = keyword ":"
 univ = keyword "U"
-row = keyword "Row"
-record = keyword "Record"
+arrow = keyword "→" <|> keyword "->" <?> "arrow"
+forall_ = keyword "∀" <|> keyword "forall" <?> "forall"
+lambda = keyword "λ" <|> symbol "\\" <?> "lambda"
+rowType = keyword "Row"
+rowLit = keyword "#"
+pipe = keyword "|"
+recordType = keyword "Rec"
+recordLit = keyword "rec"
+dot = symbol "."
+dotminus = symbol ".-"
+coloneq = keyword ":="

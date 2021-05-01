@@ -11,7 +11,7 @@ data Term
   | Hole
   | Let {-# UNPACK #-} Name (Maybe Term) Term Term
   | U
-  | Pi {-# UNPACK #-} Name Term Term
+  | Pi {-# UNPACK #-} Name (Maybe Term) Term
   | Lam {-# UNPACK #-} Name (Maybe Term) Term
   | App Term Term
   | RowType Term
@@ -19,7 +19,7 @@ data Term
   | RowExt {-# UNPACK #-} Name Term Term
   | RecordType Term
   | RecordEmpty
-  | RecordExt {-# UNPACK #-} Name Term Term
+  | RecordExt {-# UNPACK #-} Name (Maybe Term) Term Term
   | RecordProj {-# UNPACK #-} Name Term
   | RecordRestr {-# UNPACK #-} Name Term
   deriving stock (Show)

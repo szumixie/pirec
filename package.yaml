@@ -93,6 +93,7 @@ dependencies:
   - semialign
 
   - text-short
+  - enummapset
   - vector
   - mutable-containers
   - hashtables

@@ -3,46 +3,99 @@ module Unnamed.Syntax.Raw.Parse (parseRaw) where
 import Relude hiding (many, some)
 
 import Optics
-import Text.Megaparsec
+import Text.Megaparsec hiding (State)
 
 import Unnamed.Data.Span
 import Unnamed.Syntax.Raw qualified as R
 import Unnamed.Syntax.Raw.Parse.Lex
 import Unnamed.Syntax.Raw.Parse.Type
-
-data Level
-  = LeftAssoc
-      [Parser (R.Term -> R.Term -> R.Term)]
-      [Parser (R.Term -> R.Term)]
-      [Parser (R.Term -> R.Term)]
-  | RightAssoc
-      [Parser (R.Term -> R.Term -> R.Term)]
-      [Parser (R.Term -> R.Term)]
-      [Parser (R.Term -> R.Term)]
+import Unnamed.Var.Name (Name)
 
 parseRaw :: String -> Text -> Either (ParseErrorBundle Text Void) R.Term
-parseRaw = run $ spaceConsumer *> term <* eof
+parseRaw = run $ space *> termLetBlock <* eof
 
 term :: Parser R.Term
-term = foldl' addPrec (parens term <|> withSpan (choice atoms)) ops
+term = atom & termRecordSuffix & termApp & termFun
 
-atoms :: [Parser R.Term]
-atoms =
-  [ termVar
-  , termHole
-  , termU
-  , try termRowEmpty
-  , try termRowLit
-  , try termRecordEmpty
-  , termRecordLit
-  ]
+atom :: Parser R.Term
+atom =
+  choice
+    [ parens term
+    , withSpan $
+        choice
+          [ R.Var <$> ident
+          , R.Hole <$ uscore
+          , termLet
+          , R.U <$ univ
+          , termPi
+          , termLam
+          , termRowLit
+          , termRecordLit
+          ]
+    ]
+    <?> "expression"
 
-ops :: [Level]
-ops =
-  [ LeftAssoc [] [] [try termRecordProj, termRecordRestr]
-  , LeftAssoc [termApp] [termRowType, termRecordType] []
-  , RightAssoc [termFun] [termLet, try termPi, termLam] []
-  ]
+termFun :: Parser R.Term -> Parser R.Term
+termFun p = go
+ where
+  go = withSpan do
+    t <- p
+    option t $ R.Pi "_" (Just t) <$ arrow <*> go
+
+termApp :: Parser R.Term -> Parser R.Term
+termApp p = suffixes fun $ flip R.App <$> p
+ where
+  fun =
+    choice
+      [ withSpan . hidden $
+          R.RowType <$ rowType <*> p <|> R.RecordType <$ recordType <*> p
+      , p
+      ]
+
+termRecordSuffix :: Parser R.Term -> Parser R.Term
+termRecordSuffix p =
+  suffixes p . label "record projection" $
+    R.RecordRestr <$ dotminus <*> fieldLabel
+      <|> R.RecordProj <$ dot <*> fieldLabel
+
+termLet :: Parser R.Term
+termLet = let_ *> termLetBlock
+
+termLetBlock :: Parser R.Term
+termLetBlock = indentBlock \sep -> do
+  fs <- many do
+    (x, hasType) <- try $ (,) <$> ident <*> (True <$ colon <|> False <$ equals)
+    a <- if hasType then Just <$> term <* equals else pure Nothing
+    R.Let x a <$> term <* sep
+  foldr (.) id fs <$> term
+
+termPi :: Parser R.Term
+termPi =
+  foldr (.) id <$ forall_ <*> some (uncurry R.Pi <$> binder) <* arrow <*> term
+
+termLam :: Parser R.Term
+termLam =
+  foldr (.) id <$ lambda <*> some (uncurry R.Lam <$> binder) <* arrow <*> term
+
+termRowLit :: Parser R.Term
+termRowLit =
+  rowLit *> rowBlock R.RowEmpty (R.RowExt <$> fieldLabel <* colon <*> term)
+
+termRecordLit :: Parser R.Term
+termRecordLit =
+  recordLit *> rowBlock R.RecordEmpty do
+    label <- fieldLabel
+    let extend a = R.RecordExt label a <$ equals <*> term
+        modify a = do
+          t <- coloneq *> term
+          pure $ R.RecordExt label a t . R.RecordRestr label
+    choice
+      [ extend Nothing <|> modify Nothing
+      , do
+          a <- colon *> term
+          extend (Just a) <|> modify (Just a)
+      , pure $ R.RecordExt label Nothing (R.Var label)
+      ]
 
 withSpan :: Parser R.Term -> Parser R.Term
 withSpan p = do
@@ -51,100 +104,27 @@ withSpan p = do
   end <- use #lexemeEnd
   pure $ R.Span (Span start end) x
 
-addPrec :: Parser R.Term -> Level -> Parser R.Term
-addPrec p = \case
-  LeftAssoc infl pf sf -> do
-    start <- getOffset
-    let go x =
-          choice
-            [ do
-                f <- choice sf
-                end <- use #lexemeEnd
-                go $ R.Span (Span start end) (f x)
-            , do
-                f <- choice infl
-                y <- p
-                end <- use #lexemeEnd
-                go $ R.Span (Span start end) (f x y)
-            , pure x
-            ]
-    f <- option id $ choice pf
-    x <- p
-    go $ f x
-  RightAssoc infr pf sf -> go
-   where
-    go = withSpan do
-      choice pf <*> go <|> do
-        x <- p
-        choice
-          [ choice infr ?? x <*> go
-          , option id (choice sf) ?? x
-          ]
+suffixes :: Parser R.Term -> Parser (R.Term -> R.Term) -> Parser R.Term
+suffixes p sf = do
+  start <- getOffset
+  let go t = option t do
+        f <- sf
+        end <- use #lexemeEnd
+        go $ R.Span (Span start end) (f t)
+  t <- p
+  go t
 
-termVar :: Parser R.Term
-termVar = R.Var <$> ident
+binder :: Parser (Name, Maybe R.Term)
+binder =
+  choice
+    [ parens $ (,) <$> binderIdent <* colon <*> (Just <$> term)
+    , (,Nothing) <$> binderIdent
+    ]
+    <?> "binder"
 
-termHole :: Parser R.Term
-termHole = R.Hole <$ uscore
-
-termLet :: Parser (R.Term -> R.Term)
-termLet =
-  foldr (.) id <$ let_
-    <*> (R.Let <$> ident <*> optional (colon *> term) <* equals <*> term)
-      `sepEndBy1` semicolon <* in_
-
-termU :: Parser R.Term
-termU = R.U <$ univ
-
-termPi :: Parser (R.Term -> R.Term)
-termPi = foldr (.) id . join <$> some (parens binder) <* arrow
- where
-  binder = do
-    f <- some $ R.Pi <$> ident
-    a <- colon *> term
-    pure $ f ?? a
-
-termFun :: Parser (R.Term -> R.Term -> R.Term)
-termFun = R.Pi "_" <$ arrow
-
-termLam :: Parser (R.Term -> R.Term)
-termLam = foldr (.) id <$ lambda <*> some binder <* dot
- where
-  binder =
-    choice
-      [ parens $ R.Lam <$> ident <* colon <*> (Just <$> term)
-      , (`R.Lam` Nothing) <$> ident
-      ]
-
-termApp :: Parser (R.Term -> R.Term -> R.Term)
-termApp = pure R.App
-
-termRowType :: Parser (R.Term -> R.Term)
-termRowType = R.RowType <$ row
-
-termRowEmpty :: Parser R.Term
-termRowEmpty = braces $ pure R.RowEmpty
-
-termRowLit :: Parser R.Term
-termRowLit = braces do
-  exts <- (R.RowExt <$> ident <* colon <*> term) `sepEndBy1` comma
-  rest <- option R.RowEmpty $ pipe *> term
-  pure $ foldr ($) rest exts
-
-termRecordType :: Parser (R.Term -> R.Term)
-termRecordType = R.RecordType <$ record
-
-termRecordEmpty :: Parser R.Term
-termRecordEmpty = braces $ R.RecordEmpty <$ equals
-
-termRecordLit :: Parser R.Term
-termRecordLit = braces do
-  exts <- (R.RecordExt <$> ident <* equals <*> term) `sepEndBy1` comma
-  rest <- option R.RecordEmpty $ pipe *> term
-  pure $ foldr ($) rest exts
-
-termRecordProj :: Parser (R.Term -> R.Term)
-termRecordProj = R.RecordProj <$ dot <*> ident
-
-termRecordRestr :: Parser (R.Term -> R.Term)
-termRecordRestr = R.RecordRestr <$ dot <* minus <*> ident
+rowBlock :: R.Term -> Parser (R.Term -> R.Term) -> Parser R.Term
+rowBlock empty field = indentBlock \sep -> do
+  fs <- field `sepBy` sep
+  r <-
+    if null fs then pure empty else option empty $ optional sep *> pipe *> term
+  pure $ foldr ($) r fs

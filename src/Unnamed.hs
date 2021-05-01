@@ -39,7 +39,7 @@ main = withUtf8 do
   runM $ metaCtxToIO do
     (t, a) <-
       errorToIO (infer Ctx.empty raw) >>= \case
-        Right tva -> pure tva
+        Right ta -> pure ta
         Left err -> do
           perr <- prettyElabError err fp input
           embed $ hPutStr stderr perr *> exitFailure

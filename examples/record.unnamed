@@ -1,10 +1,14 @@
-let Nat = (A : _) -> Record { z : A, s : A -> A } -> A
-  ; add : Nat -> Nat -> Nat = \x y A r. x _ { z = y _ r | r.-z }
-  ; mul : Nat -> Nat -> Nat
-        = \x y A r. x _ { s = \(a : A). y _ { z = a | r.-z } | r.-s }
-  ; 2 : Nat = \A r. r.s (r.s r.z)
-  ; 4 = add 2 2
-  ; 16 = mul 4 4
-  ; F = \(x : Nat). Record (x _ { z = {}, s = \A. { field : Nat | A } })
-  ; x : F 4 = { field = 2 , field = 2 , field = 4 , field = 16 }
- in x.-field.-field
+Nat = ∀ A -> Rec #{ z : A; s : A -> A } -> A
+add : Nat -> Nat -> Nat = \x y _ r -> x _ rec{ z := y _ r | r }
+mul : Nat -> Nat -> Nat
+    = \x y A r -> x _ rec{ s := \(a : A) -> y _ rec{ z := a | r } | r }
+2 : Nat = \A r -> r.s (r.s r.z)
+4 = add 2 2
+16 = mul 4 4
+F = \(x : Nat) -> Rec (x _ rec{ z = #{}; s = \R -> #{ field : Nat | R } })
+x : F 4 = rec
+  field = 2
+  field = 2
+  field = 4
+  field = 16
+x.-field.-field

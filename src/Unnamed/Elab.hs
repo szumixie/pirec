@@ -52,11 +52,7 @@ checkInfer !ctx = (goCheck, goInfer)
     (R.Span span t, a) -> check (ctx & #span .~ span) t a
     (R.Hole, _) -> insertMeta ctx
     (R.Let x a t u, vb) -> do
-      (t, va) <- case a of
-        Nothing -> goInfer t
-        Just a -> do
-          va <- eval (ctx ^. #env) =<< goCheck a V.U
-          traverseToFst (goCheck t) va
+      (t, va) <- optionalCheck t a
       vt <- eval (ctx ^. #env) t
       u <- check (ctx & Ctx.extend x va vt) u vb
       pure $ Let x t u
@@ -77,17 +73,15 @@ checkInfer !ctx = (goCheck, goInfer)
       Just (lx, va) -> pure (Var lx, va)
     R.Hole -> (,) <$> insertMeta ctx <*> insertMetaValue ctx
     R.Let x a t u -> do
-      (t, va) <- case a of
-        Nothing -> goInfer t
-        Just a -> do
-          va <- eval (ctx ^. #env) =<< goCheck a V.U
-          traverseToFst (goCheck t) va
+      (t, va) <- optionalCheck t a
       vt <- eval (ctx ^. #env) t
       (u, vb) <- infer (ctx & Ctx.extend x va vt) u
       pure (Let x t u, vb)
     R.U -> pure (U, V.U)
     R.Pi x a b -> do
-      a <- goCheck a V.U
+      a <- case a of
+        Nothing -> insertMeta ctx
+        Just a -> goCheck a V.U
       va <- eval (ctx ^. #env) a
       b <- check (ctx & Ctx.bind x va) b V.U
       pure (Pi x a b, V.U)
@@ -128,8 +122,8 @@ checkInfer !ctx = (goCheck, goInfer)
       pure (RecordType r, V.U)
     R.RecordEmpty -> do
       pure (RecordLit mempty, V.RecordType $ V.RowLit mempty)
-    R.RecordExt label t u -> do
-      (t, va) <- goInfer t
+    R.RecordExt label a t u -> do
+      (t, va) <- optionalCheck t a
       (u, vp) <- goInfer u
       vr <- insertMetaValue ctx
       elabUnify ctx vp $ V.RecordType vr
@@ -157,3 +151,9 @@ checkInfer !ctx = (goCheck, goInfer)
       vr <- insertMetaValue ctx
       elabUnify ctx vp $ V.RecordType (V.rowExt (one (label, va)) vr)
       pure (RecordAlter (MMA.singleDelete label) t, V.RecordType vr)
+
+  optionalCheck t = \case
+    Nothing -> goInfer t
+    Just a -> do
+      va <- eval (ctx ^. #env) =<< goCheck a V.U
+      traverseToFst (goCheck t) va
