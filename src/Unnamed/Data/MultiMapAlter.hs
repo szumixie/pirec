@@ -20,7 +20,7 @@ import Optics
 
 import Unnamed.Data.MultiMap (MultiMap (..))
 
-data ElemAlter a = ElemAlter {-# UNPACK #-} Int (Seq a)
+data ElemAlter a = ElemAlter Int (Seq a)
   deriving stock (Show, Functor, Foldable, Traversable)
 
 instance Semigroup (ElemAlter a) where

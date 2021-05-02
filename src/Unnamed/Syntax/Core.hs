@@ -10,18 +10,18 @@ import Unnamed.Var.Meta (Meta)
 import Unnamed.Var.Name (Name)
 
 data Term
-  = Var {-# UNPACK #-} Level
-  | Meta {-# UNPACK #-} Meta (Maybe BoundMask)
-  | Let {-# UNPACK #-} Name Term Term
+  = Var Level
+  | Meta Meta (Maybe BoundMask)
+  | Let Name Term Term
   | U
-  | Pi {-# UNPACK #-} Name Term Term
-  | Lam {-# UNPACK #-} Name Term
+  | Pi Name Term Term
+  | Lam Name Term
   | App Term Term
   | RowType Term
   | RowLit (MultiMap Name Term)
   | RowExt (MultiMap Name Term) Term
   | RecordType Term
   | RecordLit (MultiMap Name Term)
-  | RecordProj {-# UNPACK #-} Name {-# UNPACK #-} Int Term
+  | RecordProj Name Int Term
   | RecordAlter (MultiMapAlter Name Term) Term
   deriving stock (Show)

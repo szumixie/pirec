@@ -14,7 +14,7 @@ import Unnamed.Effect.Meta
 import Unnamed.Eval
 import Unnamed.Unify.Error
 
-data Renaming = Renaming {-# UNPACK #-} Level (IntMap Level)
+data Renaming = Renaming Level (IntMap Level)
   deriving stock (Show)
 
 size :: Renaming -> Level

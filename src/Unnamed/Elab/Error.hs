@@ -24,13 +24,13 @@ import Unnamed.Value.Pretty (prettyValue)
 
 data ElabErrorType
   = UnifyError Value Value UnifyError
-  | ScopeError {-# UNPACK #-} Name
+  | ScopeError Name
   deriving stock (Show)
 
 declareFieldLabels
   [d|
     data ElabError = ElabError
-      { context :: {-# UNPACK #-} Context
+      { context :: Context
       , errorType :: ElabErrorType
       }
       deriving stock (Show)
@@ -40,7 +40,7 @@ declareFieldLabels
   [d|
     data CompElabError = CompElabError
       { metaLookup :: ~(Meta -> Maybe Value)
-      , error :: {-# UNPACK #-} ElabError
+      , error :: ElabError
       }
     |]
 

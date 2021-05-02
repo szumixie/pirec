@@ -7,8 +7,8 @@ import Optics
 declareFieldLabels
   [d|
     data Span = Span
-      { start :: {-# UNPACK #-} Int
-      , end :: {-# UNPACK #-} Int
+      { start :: Int
+      , end :: Int
       }
       deriving stock (Show)
     |]

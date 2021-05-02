@@ -1,4 +1,4 @@
-module Unnamed.Elab.Context (Context, empty, extend, bind) where
+module Unnamed.Elab.Context (Context, setSpan, level, empty, extend, bind) where
 
 import Relude hiding (empty)
 
@@ -14,11 +14,11 @@ import Unnamed.Value qualified as V
 import Unnamed.Var.Level (Level)
 import Unnamed.Var.Name (Name)
 
-declareFieldLabels
+declareFieldLabelsWith
+  (noPrefixFieldLabels & generateUpdateableOptics .~ False)
   [d|
     data Context = Context
       { span :: Span
-      , level :: {-# UNPACK #-} Level
       , env :: Env Value
       , names :: HashMap Name (Level, Value)
       , boundMask :: BoundMask
@@ -26,23 +26,25 @@ declareFieldLabels
       deriving stock (Show)
     |]
 
+setSpan :: Span -> Context -> Context
+setSpan span (Context _ env names mask) = Context span env names mask
+
+level :: Context -> Level
+level = view $ #env % to Env.level
+
 empty :: Context
-empty = Context (Span 0 0) 0 Env.empty mempty BM.empty
+empty = Context (Span 0 0) Env.empty mempty BM.empty
 
 extend :: Name -> Value -> Value -> Context -> Context
-extend x a t (Context sp lvl env names mask) =
-  Context
-    sp
-    (lvl + 1)
-    (env & Env.extend t)
-    (names & at x ?~ (lvl, a))
-    mask
+extend x a t (Context span env names mask) =
+  Context span (env & Env.extend t) (names & at x ?~ (Env.level env, a)) mask
 
 bind :: Name -> Value -> Context -> Context
-bind x a (Context sp lvl env names mask) =
+bind x a (Context span env names mask) =
   Context
-    sp
-    (lvl + 1)
+    span
     (env & Env.extend (V.var lvl))
     (names & at x ?~ (lvl, a))
     (mask & BM.extend lvl)
+ where
+  lvl = Env.level env

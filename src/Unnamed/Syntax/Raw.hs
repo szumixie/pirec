@@ -6,20 +6,20 @@ import Unnamed.Data.Span (Span)
 import Unnamed.Var.Name (Name)
 
 data Term
-  = Span {-# UNPACK #-} Span Term
-  | Var {-# UNPACK #-} Name
+  = Span Span Term
+  | Var Name
   | Hole
-  | Let {-# UNPACK #-} Name (Maybe Term) Term Term
+  | Let Name (Maybe Term) Term Term
   | U
-  | Pi {-# UNPACK #-} Name (Maybe Term) Term
-  | Lam {-# UNPACK #-} Name (Maybe Term) Term
+  | Pi Name (Maybe Term) Term
+  | Lam Name (Maybe Term) Term
   | App Term Term
   | RowType Term
   | RowEmpty
-  | RowExt {-# UNPACK #-} Name Term Term
+  | RowExt Name Term Term
   | RecordType Term
   | RecordEmpty
-  | RecordExt {-# UNPACK #-} Name (Maybe Term) Term Term
-  | RecordProj {-# UNPACK #-} Name Term
-  | RecordRestr {-# UNPACK #-} Name Term
+  | RecordExt Name (Maybe Term) Term Term
+  | RecordProj Name Term
+  | RecordRestr Name Term
   deriving stock (Show)

@@ -16,7 +16,7 @@ import Relude
 
 import Data.HashTable.IO (BasicHashTable)
 import Data.HashTable.IO qualified as HT
-import Data.Mutable
+import Data.Vector.Unboxed.Mutable qualified as U
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
 import Control.Effect
@@ -58,13 +58,13 @@ type MetaCtxToIOC m a =
 
 metaCtxToIO :: Eff (Embed IO) m => MetaCtxToIOC m a -> m a
 metaCtxToIO m = do
-  nextRef :: IOPRef Int <- embed $ newRef 1
+  nextRef :: U.IOVector Int <- embed $ U.replicate 1 1
   solveds :: BasicHashTable Meta Value <- embed HT.new
   interpret
     ( \case
         FreshMeta -> embed do
-          next <- readRef nextRef
-          Meta next <$ writeRef nextRef (next + 1)
+          next <- U.unsafeRead nextRef 0
+          Meta next <$ U.unsafeWrite nextRef 0 (next + 1)
         SolveMeta meta t -> embed $ HT.insert solveds meta t
     )
     $ interpret

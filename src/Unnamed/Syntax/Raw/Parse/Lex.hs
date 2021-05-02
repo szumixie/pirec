@@ -27,9 +27,8 @@ module Unnamed.Syntax.Raw.Parse.Lex (
 import Relude hiding (many, some)
 
 import Data.Char qualified as C
-import Data.EnumSet (EnumSet)
-import Data.EnumSet qualified as ESet
 import Data.HashSet qualified as HSet
+import Data.IntSet qualified as ISet
 
 import Optics
 import Text.Megaparsec
@@ -62,13 +61,13 @@ lexeme p = do
 symbol :: Text -> Parser Text
 symbol = lexeme . chunk
 
-specialChars :: EnumSet Char
-specialChars = ESet.fromList "(){};\\.\""
+specialChars :: IntSet
+specialChars = ISet.fromList $ fromEnum <$> "(){};\\.\""
 
 isIdentLetter :: Char -> Bool
 isIdentLetter c
   | C.isAlphaNum c || C.isMark c = True
-  | c `ESet.member` specialChars = False
+  | specialChars ^. contains (fromEnum c) = False
   | otherwise = C.isPunctuation c || C.isSymbol c
 
 keywords :: HashSet Text
@@ -99,7 +98,7 @@ ident :: Parser Name
 ident = lexeme $ try do
   offset <- getOffset
   text <- takeWhile1P (Just "identifier") isIdentLetter
-  if text `HSet.member` keywords
+  if keywords ^. contains text
     then
       region (setErrorOffset offset) . label "identifier" $
         unexpected (Tokens $ text & toString & fromList)

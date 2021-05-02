@@ -32,7 +32,7 @@ elabUnify ::
   Effs [MetaCtx, Throw ElabError] m => Context -> Value -> Value -> m ()
 elabUnify ctx t t' =
   throwToThrow (ElabError ctx . UnifyError t t') $
-    unify (ctx ^. #level) t t'
+    unify (Ctx.level ctx) t t'
 
 check ::
   Effs [MetaCtx, Throw ElabError] m => Context -> R.Term -> Value -> m Term
@@ -49,7 +49,7 @@ checkInfer ::
 checkInfer !ctx = (goCheck, goInfer)
  where
   goCheck = curry \case
-    (R.Span span t, a) -> check (ctx & #span .~ span) t a
+    (R.Span span t, a) -> check (ctx & Ctx.setSpan span) t a
     (R.Hole, _) -> insertMeta ctx
     (R.Let x a t u, vb) -> do
       (t, va) <- optionalCheck t a
@@ -60,14 +60,14 @@ checkInfer !ctx = (goCheck, goInfer)
       whenJust a \a -> do
         va <- eval (ctx ^. #env) =<< goCheck a V.U
         elabUnify ctx va va'
-      vb <- openClosure (ctx ^. #level) closure
+      vb <- openClosure (Ctx.level ctx) closure
       Lam x <$> check (ctx & Ctx.bind x va') t vb
     (t, va') -> do
       (t, va) <- goInfer t
       t <$ elabUnify ctx va va'
 
   goInfer = \case
-    R.Span span t -> infer (ctx & #span .~ span) t
+    R.Span span t -> infer (ctx & Ctx.setSpan span) t
     R.Var x -> case ctx ^. #names % at x of
       Nothing -> throw $ ElabError ctx (ScopeError x)
       Just (lx, va) -> pure (Var lx, va)

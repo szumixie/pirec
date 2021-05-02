@@ -13,10 +13,10 @@ data Tree a
   | Leaf ~a
 
 data Trees a
-  = TCons {-# UNPACK #-} Int (Tree a) (Trees a)
+  = TCons Int (Tree a) (Trees a)
   | TNil
 
-data RList a = RList {-# UNPACK #-} Int (Trees a)
+data RList a = RList Int (Trees a)
   deriving stock (Functor, Traversable)
 
 instance Show a => Show (RList a) where

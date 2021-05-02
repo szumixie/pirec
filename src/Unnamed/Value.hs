@@ -29,8 +29,8 @@ data Closure = Closure (Env Value) Term
 data Value
   = Neut Var Spine
   | U
-  | Pi {-# UNPACK #-} Name ~Value Closure
-  | Lam {-# UNPACK #-} Name {-# UNPACK #-} Closure
+  | Pi Name ~Value Closure
+  | Lam Name Closure
   | RowType Value
   | RowLit (MultiMap Name Value)
   | RecordType Value
@@ -38,15 +38,15 @@ data Value
   deriving stock (Show)
 
 data Var
-  = Rigid {-# UNPACK #-} Level
-  | Flex {-# UNPACK #-} Meta
+  = Rigid Level
+  | Flex Meta
   deriving stock (Show, Eq)
 
 data Spine
   = Nil
   | App Spine ~Value
   | RowExt (MultiMap Name Value) Spine
-  | RecordProj {-# UNPACK #-} Name {-# UNPACK #-} Int Spine
+  | RecordProj Name Int Spine
   | RecordAlter (MultiMapAlter Name Value) Spine
   deriving stock (Show)
 

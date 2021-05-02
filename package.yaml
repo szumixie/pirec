@@ -93,9 +93,7 @@ dependencies:
   - semialign
 
   - text-short
-  - enummapset
   - vector
-  - mutable-containers
   - hashtables
 
   - optics
@@ -175,12 +173,12 @@ when:
   - condition: flag(release)
     ghc-options:
       - -O2
+      - -funbox-strict-fields
   - condition: "!flag(release)"
     dependencies:
       - pretty-simple
   - condition: flag(dump)
     ghc-options:
-      - -O2
       - -ddump-to-file
       - -dumpdir=.dumps
       - -ddump-simpl

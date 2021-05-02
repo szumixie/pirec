@@ -12,10 +12,11 @@ import Unnamed.Value (Value)
 
 import Unnamed.Effect.Meta
 import Unnamed.Elab.Context (Context)
+import Unnamed.Elab.Context qualified as Ctx
 import Unnamed.Eval (quote)
 
 prettyValue :: Eff MetaLookup m => Context -> Value -> m (Doc ann)
-prettyValue ctx = fmap (prettyTermWith pctx 0) . quote (ctx ^. #level)
+prettyValue ctx = fmap (prettyTermWith pctx 0) . quote (Ctx.level ctx)
  where
   pctx =
     ctx ^. #names

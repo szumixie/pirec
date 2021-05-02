@@ -17,7 +17,7 @@ declareFieldLabels
 declareFieldLabels
   [d|
     data ParseState = ParseState
-      { lexemeEnd :: {-# UNPACK #-} Int
+      { lexemeEnd :: Int
       , lineStart :: Bool
       }
       deriving stock (Show)
