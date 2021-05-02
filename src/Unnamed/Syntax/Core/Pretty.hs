@@ -61,7 +61,7 @@ prettyTermWith !ctx = go
         <> dot
         <> pretty label
     RecordAlter ts u ->
-      align $
+      ("rec" <>) . align $
         encloseSep
           "{ "
           ( line <> " | "
