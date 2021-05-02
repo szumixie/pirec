@@ -1,6 +1,6 @@
-Nat = ∀ A -> Rec #{ z : A; s : A -> A } -> A
-5 : Nat = \A r -> r.s (r.s (r.s (r.s (r.s r.z))))
-add : Nat -> Nat -> Nat = \x y _ r -> x _ rec{ z := y _ r | r }
-add5x : ∀ R -> Rec #{ x : Nat | R } -> Rec #{ x : Nat | R }
-      = \R r -> rec{ x := add r.x 5 | r }
+Nat = ∀ A → Rec #{ z : A; s : A → A } → A
+5 : Nat = λ A r → r.s (r.s (r.s (r.s (r.s r.z))))
+add : Nat → Nat → Nat = λ x y _ r → x _ rec{ z := y _ r | r }
+add5x : ∀ R → Rec #{ x : Nat | R } → Rec #{ x : Nat | R }
+      = λ R r → rec{ x := add r.x 5 | r }
 add5x _ rec{ x = 5; y = 5 }
