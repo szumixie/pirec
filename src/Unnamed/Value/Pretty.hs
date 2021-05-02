@@ -7,7 +7,7 @@ import Data.Text.Prettyprint.Doc (Doc)
 import Optics
 
 import Unnamed.Syntax.Core.Pretty (prettyTermWith)
-import Unnamed.Syntax.Core.Pretty qualified as Pretty
+import Unnamed.Syntax.Core.Pretty.Context qualified as Pretty
 import Unnamed.Value (Value)
 
 import Unnamed.Effect.Meta
@@ -21,4 +21,4 @@ prettyValue ctx = fmap (prettyTermWith pctx 0) . quote (ctx ^. #level)
     ctx ^. #names
       & itoListOf (ifolded % _1)
       & sortWith snd
-      & foldlOf' (folded % _1) (flip Pretty.extendCtx) Pretty.emptyCtx
+      & foldlOf' (folded % _1) (flip Pretty.extend) Pretty.empty

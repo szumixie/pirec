@@ -16,7 +16,7 @@ import Unnamed.Value.Pretty (prettyValue)
 
 data UnifyError
   = Mismatch Value Value
-  | ScopeError Level
+  | ScopeError Meta Level
   | OccursError Meta
   | Nonlinear Level
   | Nonvariable Value
@@ -28,10 +28,16 @@ prettyUnifyError ctx = \case
   Mismatch a a' -> do
     a <- prettyValue ctx a
     a' <- prettyValue ctx a'
-    pure $ vsep ["expected type:", a, "but got inferred type:", a']
-  ScopeError lvl -> do
+    pure $
+      vsep
+        [ "expected type:"
+        , indent 2 a
+        , "but got inferred type:"
+        , indent 2 a'
+        ]
+  ScopeError meta lvl -> do
     x <- prettyValue ctx $ V.var lvl
-    pure $ "variable" <+> x <+> "not in scope"
+    pure $ "variable" <+> x <+> "not in scope when solving" <+> pretty meta
   OccursError meta -> pure $ "occurs check failed when solving" <+> pretty meta
   Nonlinear lvl -> do
     x <- prettyValue ctx $ V.var lvl
@@ -40,5 +46,5 @@ prettyUnifyError ctx = \case
         <+> "in the context"
   Nonvariable t -> do
     t <- prettyValue ctx t
-    pure $ "got nonvariable in the context:" <> line <> t
+    pure $ "got nonvariable in the context:" <> line <> indent 2 t
   NonInvertable -> pure "got non-invertable spine"

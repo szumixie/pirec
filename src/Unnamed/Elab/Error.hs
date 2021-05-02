@@ -63,9 +63,9 @@ instance ShowErrorComponent CompElabError where
             vsep
               [ puerr
               , "when unifying expected type:"
-              , a
+              , indent 2 a
               , "with inferred type:"
-              , a'
+              , indent 2 a'
               ]
         ScopeError x -> pure $ "variable" <+> pretty x <+> "out of scope"
   errorComponentLen = view $ #error % #context % #span % Span.length

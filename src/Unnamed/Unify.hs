@@ -32,7 +32,7 @@ rename meta = quoteWith go Renaming.lift
  where
   go renaming = \case
     V.Rigid lx -> case renaming & Renaming.rename lx of
-      Nothing -> throw $ ScopeError lx
+      Nothing -> throw $ ScopeError meta lx
       Just lx -> pure $ Var lx
     V.Flex mx
       | mx == meta -> throw $ OccursError meta
