@@ -18,8 +18,9 @@ import Unnamed.Data.MultiMap (MultiMap)
 import Unnamed.Data.MultiMapAlter (MultiMapAlter)
 import Unnamed.Data.MultiMapAlter qualified as MMA
 import Unnamed.Env (Env)
+import Unnamed.Plicity (Plicity)
 import Unnamed.Syntax.Core (Term)
-import Unnamed.Var.Level (Level (..))
+import Unnamed.Var.Level (Level)
 import Unnamed.Var.Meta (Meta)
 import Unnamed.Var.Name (Name)
 
@@ -29,8 +30,8 @@ data Closure = Closure (Env Value) Term
 data Value
   = Neut Var Spine
   | U
-  | Pi Name ~Value Closure
-  | Lam Name Closure
+  | Pi Plicity Name ~Value Closure
+  | Lam Plicity Name Closure
   | RowType Value
   | RowLit (MultiMap Name Value)
   | RecordType Value
@@ -44,7 +45,7 @@ data Var
 
 data Spine
   = Nil
-  | App Spine ~Value
+  | App Plicity Spine ~Value
   | RowExt (MultiMap Name Value) Spine
   | RecordProj Name Int Spine
   | RecordAlter (MultiMapAlter Name Value) Spine

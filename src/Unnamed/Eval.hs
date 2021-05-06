@@ -17,6 +17,7 @@ import Optics
 import Unnamed.BoundMask qualified as BM
 import Unnamed.Env (Env)
 import Unnamed.Env qualified as Env
+import Unnamed.Plicity (Plicity (..))
 import Unnamed.Syntax.Core (Term (..))
 import Unnamed.Value (Closure, Spine, Value)
 import Unnamed.Value qualified as V
@@ -35,14 +36,18 @@ eval env t = do
           Meta mx mmask -> case mmask of
             Nothing -> t
             Just mask ->
-              env & foldrOf (BM.masked mask) (flip $ appValuePure mlookup) t
+              env
+                & foldrOf
+                  (BM.masked mask)
+                  (flip $ appValuePure mlookup Explicit)
+                  t
            where
             t = mlookup mx ?: V.meta mx
           Let _ t u -> goEnv (env & Env.extend (go t)) u
           U -> V.U
-          Pi x a b -> V.Pi x (go a) (V.Closure env b)
-          Lam x t -> V.Lam x (V.Closure env t)
-          App t u -> appValuePure mlookup (go t) (go u)
+          Pi pl x a b -> V.Pi pl x (go a) (V.Closure env b)
+          Lam pl x t -> V.Lam pl x (V.Closure env t)
+          App pl t u -> appValuePure mlookup pl (go t) (go u)
           RowType a -> V.RowType (go a)
           RowLit ts -> V.RowLit (go <$> ts)
           RowExt ts row -> V.rowExt (go <$> ts) (go row)
@@ -55,21 +60,23 @@ eval env t = do
 appClosure :: Eff MetaLookup m => Closure -> Value -> m Value
 appClosure (V.Closure env t) u = eval (env & Env.extend u) t
 
-appValue :: Eff MetaLookup m => Value -> Value -> m Value
-appValue t u = case t of
-  V.Neut x spine -> pure $ V.Neut x (V.App spine u)
-  V.Lam _ closure -> appClosure closure u
+appValue :: Eff MetaLookup m => Plicity -> Value -> Value -> m Value
+appValue pl t u = case t of
+  V.Neut x spine -> pure $ V.Neut x (V.App pl spine u)
+  V.Lam pl' _ closure | pl == pl' -> appClosure closure u
   _ -> error "bug"
 
-appValuePure :: (Meta -> Maybe Value) -> Value -> Value -> Value
-appValuePure mlookup t u = run $ runMetaLookup mlookup (appValue t u)
+appValuePure :: (Meta -> Maybe Value) -> Plicity -> Value -> Value -> Value
+appValuePure mlookup pl t u = run $ runMetaLookup mlookup (appValue pl t u)
 
 appSpine :: Eff MetaLookup m => Value -> Spine -> m Value
 appSpine t = go
  where
   go = \case
     V.Nil -> pure t
-    V.App spine u -> go spine >>= (`appValue` u)
+    V.App pl spine u -> do
+      spine <- go spine
+      appValue pl spine u
     V.RowExt us spine -> V.rowExt us <$> go spine
     V.RecordProj label index spine -> V.recordProj label index <$> go spine
     V.RecordAlter us spine -> V.recordAlter us <$> go spine
@@ -100,7 +107,7 @@ quoteWith quoteVar f = goAcc
           x <- quoteVar acc x
           let goSpine = \case
                 V.Nil -> pure x
-                V.App spine t -> App <$> goSpine spine <*> go t
+                V.App pl spine t -> App pl <$> goSpine spine <*> go t
                 V.RowExt ts spine -> RowExt <$> traverse go ts <*> goSpine spine
                 V.RecordProj label index spine ->
                   RecordProj label index <$> goSpine spine
@@ -108,8 +115,8 @@ quoteWith quoteVar f = goAcc
                   RecordAlter <$> traverse go ts <*> goSpine spine
           goSpine spine
         V.U -> pure U
-        V.Pi x a closure -> Pi x <$> go a <*> goClosure closure
-        V.Lam x closure -> Lam x <$> goClosure closure
+        V.Pi pl x a closure -> Pi pl x <$> go a <*> goClosure closure
+        V.Lam pl x closure -> Lam pl x <$> goClosure closure
         V.RowType a -> RowType <$> go a
         V.RowLit ts -> RowLit <$> traverse go ts
         V.RecordType row -> RecordType <$> go row

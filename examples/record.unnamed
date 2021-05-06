@@ -1,11 +1,11 @@
-Nat = ∀ A → Rec #{ z : A; s : A → A } → A
-add : Nat → Nat → Nat = λ x y _ r → x _ rec{ z := y _ r | r }
+Nat = ∀ {A} → Rec #{ z : A; s : A → A } → A
+add : Nat → Nat → Nat = λ x y r → x rec{ z := y r | r }
 mul : Nat → Nat → Nat
-    = λ x y A r → x _ rec{ s := λ (a : A) → y _ rec{ z := a | r } | r }
-2 : Nat = λ A r → r.s (r.s r.z)
+    = λ x y {A} r → x rec{ s := λ (a : A) → y rec{ z := a | r } | r }
+2 : Nat = λ r → r.s (r.s r.z)
 4 = add 2 2
 16 = mul 4 4
-F = λ (x : Nat) → Rec (x _ rec{ z = #{}; s = λ R → #{ field : Nat | R } })
+F = λ (x : Nat) → Rec (x rec{ z = #{}; s = λ R → #{ field : Nat | R } })
 x : F 4 = rec
   field = 2
   field = 2

@@ -38,14 +38,18 @@ rename meta = quoteWith go Renaming.lift
       | mx == meta -> throw $ OccursError meta
       | otherwise -> pure $ Meta mx Nothing
 
+abstract :: Spine -> Term -> Term
+abstract spine t = case spine of
+  V.Nil -> t
+  V.App pl spine _ -> abstract spine $ Lam pl "v" t
+  _ -> error "bug"
+
 solve ::
   Effs [MetaCtx, Throw UnifyError] m => Level -> Meta -> Spine -> Value -> m ()
 solve lvl meta spine t = do
   renaming <- Renaming.invert spine
   t <- rename meta renaming lvl t
-  solution <-
-    eval Env.empty . flipfoldl' ($) t $
-      replicate (coerce $ Renaming.size renaming) (Lam "x")
+  solution <- eval Env.empty $ abstract spine t
   solveMeta meta solution
 
 unify :: Effs [MetaCtx, Throw UnifyError] m => Level -> Value -> Value -> m ()
@@ -58,8 +62,9 @@ unify !lvl = go
          where
           goSpine = curry \case
             (V.Nil, V.Nil) -> pass
-            (V.App spine t, V.App spine' t') ->
-              goSpine spine spine' *> go t t'
+            (V.App pl spine t, V.App pl' spine' t')
+              | pl == pl' ->
+                goSpine spine spine' *> go t t'
             (V.RowExt ts spine, V.RowExt ts' spine')
               | Just ms <- MM.match go ts ts' -> do
                 sequenceA_ ms
@@ -104,21 +109,21 @@ unify !lvl = go
         (V.Neut (V.Flex mx) spine, t) -> solve lvl mx spine t
         (t, V.Neut (V.Flex mx) spine) -> solve lvl mx spine t
         (V.U, V.U) -> pass
-        (V.Pi _ a closure, V.Pi _ a' closure') -> do
+        (V.Pi pl _ a closure, V.Pi pl' _ a' closure') | pl == pl' -> do
           go a a'
           b <- openClosure lvl closure
           b' <- openClosure lvl closure'
           unify (lvl + 1) b b'
-        (V.Lam _ closure, V.Lam _ closure') -> do
+        (V.Lam pl _ closure, V.Lam pl' _ closure') | pl == pl' -> do
           t <- openClosure lvl closure
           t' <- openClosure lvl closure'
           unify (lvl + 1) t t'
-        (V.Lam _ closure, V.Neut x spine) -> do
+        (V.Lam pl _ closure, V.Neut x spine) -> do
           t <- openClosure lvl closure
-          unify (lvl + 1) t (V.Neut x $ V.App spine (V.var lvl))
-        (V.Neut x spine, V.Lam _ closure) -> do
+          unify (lvl + 1) t (V.Neut x $ V.App pl spine (V.var lvl))
+        (V.Neut x spine, V.Lam pl _ closure) -> do
           t <- openClosure lvl closure
-          unify (lvl + 1) (V.Neut x $ V.App spine (V.var lvl)) t
+          unify (lvl + 1) (V.Neut x $ V.App pl spine (V.var lvl)) t
         (V.RowType a, V.RowType a') -> go a a'
         (V.RowLit ts, V.RowLit ts')
           | Just ms <- MM.match go ts ts' ->

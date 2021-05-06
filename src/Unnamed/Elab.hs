@@ -8,6 +8,7 @@ import Control.Effect.Error
 import Optics
 
 import Unnamed.Data.MultiMapAlter qualified as MMA
+import Unnamed.Plicity
 import Unnamed.Syntax.Core (Term (..))
 import Unnamed.Syntax.Raw qualified as R
 import Unnamed.Value (Value)
@@ -23,10 +24,10 @@ import Unnamed.Unify (unify)
 insertMeta :: Eff MetaState m => Context -> m Term
 insertMeta ctx = do
   meta <- freshMeta
-  pure $ Meta meta (Just $ ctx ^. #boundMask)
+  pure $ Meta meta (Just $ Ctx.boundMask ctx)
 
 insertMetaValue :: Eff MetaCtx m => Context -> m Value
-insertMetaValue ctx = eval (ctx ^. #env) =<< insertMeta ctx
+insertMetaValue ctx = eval (Ctx.env ctx) =<< insertMeta ctx
 
 elabUnify ::
   Effs [MetaCtx, Throw ElabError] m => Context -> Value -> Value -> m ()
@@ -49,64 +50,72 @@ checkInfer ::
 checkInfer !ctx = (goCheck, goInfer)
  where
   goCheck = curry \case
-    (R.Span span t, a) -> check (ctx & Ctx.setSpan span) t a
+    (R.Span span t, a) -> check (ctx & Ctx.span .~ span) t a
     (R.Hole, _) -> insertMeta ctx
     (R.Let x a t u, vb) -> do
       (t, va) <- optionalCheck t a
-      vt <- eval (ctx ^. #env) t
+      vt <- eval (Ctx.env ctx) t
       u <- check (ctx & Ctx.extend x va vt) u vb
       pure $ Let x t u
-    (R.Lam x a t, V.Pi _ va' closure) -> do
+    (R.Lam pl x a t, V.Pi pl' _ va' closure) | pl == pl' -> do
       whenJust a \a -> do
-        va <- eval (ctx ^. #env) =<< goCheck a V.U
+        va <- eval (Ctx.env ctx) =<< goCheck a V.U
         elabUnify ctx va va'
       vb <- openClosure (Ctx.level ctx) closure
-      Lam x <$> check (ctx & Ctx.bind x va') t vb
+      Lam pl x <$> check (ctx & Ctx.bind x va') t vb
+    (t, V.Pi Implicit x _ closure) -> do
+      vb <- openClosure (Ctx.level ctx) closure
+      Lam Implicit x <$> check (ctx & Ctx.insert x) t vb
     (t, va') -> do
-      (t, va) <- goInfer t
+      (t, va) <- uncurry (insertImplAppNoBeta ctx) =<< goInfer t
       t <$ elabUnify ctx va va'
 
   goInfer = \case
-    R.Span span t -> infer (ctx & Ctx.setSpan span) t
-    R.Var x -> case ctx ^. #names % at x of
+    R.Span span t -> infer (ctx & Ctx.span .~ span) t
+    R.Var x -> case ctx & Ctx.getName x of
       Nothing -> throw $ ElabError ctx (ScopeError x)
       Just (lx, va) -> pure (Var lx, va)
     R.Hole -> (,) <$> insertMeta ctx <*> insertMetaValue ctx
     R.Let x a t u -> do
       (t, va) <- optionalCheck t a
-      vt <- eval (ctx ^. #env) t
+      vt <- eval (Ctx.env ctx) t
       (u, vb) <- infer (ctx & Ctx.extend x va vt) u
       pure (Let x t u, vb)
     R.U -> pure (U, V.U)
-    R.Pi x a b -> do
+    R.Pi pl x a b -> do
       a <- case a of
         Nothing -> insertMeta ctx
         Just a -> goCheck a V.U
-      va <- eval (ctx ^. #env) a
+      va <- eval (Ctx.env ctx) a
       b <- check (ctx & Ctx.bind x va) b V.U
-      pure (Pi x a b, V.U)
-    R.Lam x a t -> do
+      pure (Pi pl x a b, V.U)
+    R.Lam pl x a t -> do
       va <- case a of
         Nothing -> insertMetaValue ctx
-        Just a -> eval (ctx ^. #env) =<< goCheck a V.U
-      (t, vb) <- infer (ctx & Ctx.bind x va) t
-      closure <- closeValue (ctx ^. #env) vb
-      pure (Lam x t, V.Pi x va closure)
-    R.App t u -> do
-      (t, vp) <- goInfer t
+        Just a -> eval (Ctx.env ctx) =<< goCheck a V.U
+      (t, vb) <-
+        uncurry (insertImplAppNoBeta ctx) =<< infer (ctx & Ctx.bind x va) t
+      closure <- closeValue (Ctx.env ctx) vb
+      pure (Lam pl x t, V.Pi pl x va closure)
+    R.App pl t u -> do
+      (t, vp) <- case pl of
+        Explicit -> uncurry (insertImplApp ctx) =<< goInfer t
+        Implicit -> goInfer t
       (va, closure) <-
         forceValue vp >>= \case
-          V.Pi _ va closure -> pure (va, closure)
+          V.Pi pl' _ va closure
+            | pl' == pl -> pure (va, closure)
+            | otherwise -> throw $ ElabError ctx (PlicityMismatch pl pl')
           vp -> do
             va <- insertMetaValue ctx
             closure <-
-              V.Closure (ctx ^. #env) <$> insertMeta (ctx & Ctx.bind "x" va)
-            elabUnify ctx vp $ V.Pi "x" va closure
+              V.Closure (Ctx.env ctx) <$> insertMeta (ctx & Ctx.bind "v" va)
+            elabUnify ctx vp $ V.Pi pl "v" va closure
             pure (va, closure)
       u <- goCheck u va
-      vu <- eval (ctx ^. #env) u
+      vu <- eval (Ctx.env ctx) u
       vb <- appClosure closure vu
-      pure (App t u, vb)
+      pure (App pl t u, vb)
     R.RowType a -> do
       a <- goCheck a V.U
       pure (RowType a, V.U)
@@ -155,5 +164,30 @@ checkInfer !ctx = (goCheck, goInfer)
   optionalCheck t = \case
     Nothing -> goInfer t
     Just a -> do
-      va <- eval (ctx ^. #env) =<< goCheck a V.U
+      va <- eval (Ctx.env ctx) =<< goCheck a V.U
       traverseToFst (goCheck t) va
+
+insertImplApp ::
+  Effs [MetaCtx, Throw ElabError] m =>
+  Context ->
+  Term ->
+  Value ->
+  m (Term, Value)
+insertImplApp ctx = go
+ where
+  go t =
+    forceValue >=> \case
+      V.Pi Implicit _ _ closure -> do
+        u <- insertMeta ctx
+        go (App Implicit t u) =<< appClosure closure =<< eval (Ctx.env ctx) u
+      va -> pure (t, va)
+
+insertImplAppNoBeta ::
+  Effs [MetaCtx, Throw ElabError] m =>
+  Context ->
+  Term ->
+  Value ->
+  m (Term, Value)
+insertImplAppNoBeta ctx t va = case t of
+  Lam Implicit _ _ -> pure (t, va)
+  _ -> insertImplApp ctx t va

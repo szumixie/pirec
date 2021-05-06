@@ -38,7 +38,7 @@ prettyTermWith !ctx = go
       args = ctx ^. #env & toListOf (BM.masked mask % to pretty)
     t@Let{} -> prettyLet ctx t
     U -> "U"
-    t@(Pi "_" _ _) -> parensIf (prec > 0) $ prettyFun ctx t
+    t@(Pi _ "_" _ _) -> parensIf (prec > 0) $ prettyFun ctx t
     t@Pi{} -> parensIf (prec > 0) $ prettyPi ctx t
     t@Lam{} -> parensIf (prec > 0) $ prettyLam ctx t
     t@App{} -> parensIf (prec > 10) $ u <+> align (sep args)
@@ -77,7 +77,7 @@ prettyTermWith !ctx = go
             Nothing -> Left x
             Just t -> Right (x, t)
   goApp args = \case
-    App t u -> goApp (go 11 u : args) t
+    App _ t u -> goApp (go 11 u : args) t
     t -> (go 11 t, args)
 
 prettyLet :: Context -> Term -> Doc ann
@@ -93,7 +93,7 @@ prettyPi ctx t = align $ sep [forall_ <+> align (sep binders <+> arrow), u]
  where
   (binders, u) = go ctx t
   go ctx = \case
-    Pi (freshName (ctx ^. #names) -> x) a b
+    Pi _ (freshName (ctx ^. #names) -> x) a b
       | x /= "_" ->
         go (ctx & Ctx.extend x) b
           & _1 %~ (parens (pretty x <+> colon <+> prettyTermWith ctx 0 a) :)
@@ -103,7 +103,7 @@ prettyFun :: Context -> Term -> Doc ann
 prettyFun ctx t = align (sep $ go ctx t)
  where
   go ctx = \case
-    Pi "_" a b -> prettyTermWith ctx 1 a <+> arrow : go (ctx & Ctx.extend "_") b
+    Pi _ "_" a b -> prettyTermWith ctx 1 a <+> arrow : go (ctx & Ctx.extend "_") b
     t -> [prettyTermWith ctx 0 t]
 
 prettyLam :: Context -> Term -> Doc ann
@@ -111,7 +111,7 @@ prettyLam ctx t = align $ sep [lambda <+> align (sep binders <+> arrow), u]
  where
   (binders, u) = go ctx t
   go ctx = \case
-    Lam (freshName (ctx ^. #names) -> x) t ->
+    Lam _ (freshName (ctx ^. #names) -> x) t ->
       go (ctx & Ctx.extend x) t
         & _1 %~ (pretty x :)
     t -> ([], prettyTermWith ctx 0 t)

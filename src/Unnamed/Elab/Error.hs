@@ -13,18 +13,21 @@ import Prettyprinter.Render.String (renderString)
 import Text.Megaparsec hiding (label)
 
 import Unnamed.Data.Span qualified as Span
+import Unnamed.Elab.Context (Context)
+import Unnamed.Elab.Context qualified as Ctx
+import Unnamed.Plicity (Plicity)
 import Unnamed.Value (Value)
 import Unnamed.Var.Meta (Meta)
 import Unnamed.Var.Name (Name)
 
 import Unnamed.Effect.Meta
-import Unnamed.Elab.Context (Context)
 import Unnamed.Unify.Error (UnifyError, prettyUnifyError)
 import Unnamed.Value.Pretty (prettyValue)
 
 data ElabErrorType
   = UnifyError Value Value UnifyError
   | ScopeError Name
+  | PlicityMismatch Plicity Plicity
   deriving stock (Show)
 
 declareFieldLabels
@@ -68,7 +71,16 @@ instance ShowErrorComponent CompElabError where
               , indent 2 a'
               ]
         ScopeError x -> pure $ "variable" <+> pretty x <+> "out of scope"
-  errorComponentLen = view $ #error % #context % #span % Span.length
+        PlicityMismatch pl pl' ->
+          pure $
+            hsep
+              [ "got"
+              , pretty pl
+              , "application when"
+              , pretty pl'
+              , "application was expected"
+              ]
+  errorComponentLen = view $ #error % #context % Ctx.span % Span.length
 
 prettyElabError :: Eff MetaLookup m => ElabError -> FilePath -> Text -> m String
 prettyElabError err fp input = do
@@ -77,7 +89,7 @@ prettyElabError err fp input = do
     ParseErrorBundle
       ( one $
           FancyError
-            (err ^. #context % #span % #start)
+            (err ^. #context % Ctx.span % #start)
             (one $ ErrorCustom (CompElabError mlookup err))
       )
       (PosState input 0 (initialPos fp) defaultTabWidth "")

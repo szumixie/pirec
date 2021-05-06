@@ -3,6 +3,7 @@ module Unnamed.Syntax.Raw (Term (..)) where
 import Relude
 
 import Unnamed.Data.Span (Span)
+import Unnamed.Plicity (Plicity)
 import Unnamed.Var.Name (Name)
 
 data Term
@@ -11,9 +12,9 @@ data Term
   | Hole
   | Let Name (Maybe Term) Term Term
   | U
-  | Pi Name (Maybe Term) Term
-  | Lam Name (Maybe Term) Term
-  | App Term Term
+  | Pi Plicity Name (Maybe Term) Term
+  | Lam Plicity Name (Maybe Term) Term
+  | App Plicity Term Term
   | RowType Term
   | RowEmpty
   | RowExt Name Term Term

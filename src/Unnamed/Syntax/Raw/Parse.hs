@@ -6,6 +6,7 @@ import Optics
 import Text.Megaparsec hiding (State)
 
 import Unnamed.Data.Span
+import Unnamed.Plicity (Plicity (..))
 import Unnamed.Syntax.Raw qualified as R
 import Unnamed.Syntax.Raw.Parse.Lex
 import Unnamed.Syntax.Raw.Parse.Type
@@ -40,10 +41,12 @@ termFun p = go
  where
   go = withSpan do
     t <- p
-    option t $ R.Pi "_" (Just t) <$ arrow <*> go
+    option t $ R.Pi Explicit "_" (Just t) <$ arrow <*> go
 
 termApp :: Parser R.Term -> Parser R.Term
-termApp p = suffixes fun $ flip R.App <$> p
+termApp p = suffixes fun $ do
+  (pl, u) <- braces ((Implicit,) <$> term) <|> (Explicit,) <$> p
+  pure \t -> R.App pl t u
  where
   fun =
     choice
@@ -71,11 +74,15 @@ termLetBlock = indentBlock \sep -> do
 
 termPi :: Parser R.Term
 termPi =
-  foldr (.) id <$ forall_ <*> some (uncurry R.Pi <$> binder) <* arrow <*> term
+  foldr (.) id <$ forall_
+    <*> some (binder <&> \(pl, x, a) -> R.Pi pl x a) <* arrow
+    <*> term
 
 termLam :: Parser R.Term
 termLam =
-  foldr (.) id <$ lambda <*> some (uncurry R.Lam <$> binder) <* arrow <*> term
+  foldr (.) id <$ lambda
+    <*> some (binder <&> \(pl, x, a) -> R.Lam pl x a) <* arrow
+    <*> term
 
 termRowLit :: Parser R.Term
 termRowLit =
@@ -114,11 +121,12 @@ suffixes p sf = do
   t <- p
   go t
 
-binder :: Parser (Name, Maybe R.Term)
+binder :: Parser (Plicity, Name, Maybe R.Term)
 binder =
   choice
-    [ parens $ (,) <$> binderIdent <* colon <*> (Just <$> term)
-    , (,Nothing) <$> binderIdent
+    [ parens $ (Explicit,,) <$> binderIdent <*> optional (colon *> term)
+    , braces $ (Implicit,,) <$> binderIdent <*> optional (colon *> term)
+    , (Explicit,,Nothing) <$> binderIdent
     ]
     <?> "binder"
 

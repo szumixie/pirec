@@ -31,7 +31,7 @@ invert = go
  where
   go = \case
     V.Nil -> pure $ Renaming 0 mempty
-    V.App spine t -> do
+    V.App _ spine t -> do
       Renaming s m <- go spine
       forceValue t >>= \case
         V.Neut (V.Rigid lx@(Level n)) V.Nil

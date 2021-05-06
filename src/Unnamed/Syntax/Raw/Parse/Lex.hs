@@ -5,6 +5,7 @@ module Unnamed.Syntax.Raw.Parse.Lex (
   fieldLabel,
   indentBlock,
   parens,
+  braces,
   semicolon,
   uscore,
   let_,

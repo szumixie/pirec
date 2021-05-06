@@ -1,7 +1,7 @@
-Nat = ∀ A → (A → A) → A → A
-add : Nat → Nat → Nat = λ x y _ s z → x _ s (y _ s z)
-mul : Nat → Nat → Nat = λ x y _ s z → x _ (y _ s) z
-5 : Nat = λ _ s z → s (s (s (s (s z))))
+Nat = ∀ {A} → (A → A) → A → A
+add : Nat → Nat → Nat = λ x y s z → x s (y s z)
+mul : Nat → Nat → Nat = λ x y s z → x (y s) z
+5 : Nat = λ s z → s (s (s (s (s z))))
 10   = add 5 5
 100  = mul 10 10
 1000 = mul 10 100
