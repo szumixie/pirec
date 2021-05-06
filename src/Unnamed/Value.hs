@@ -29,7 +29,7 @@ data Closure = Closure (Env Value) Term
 
 data Value
   = Neut Var Spine
-  | U
+  | Univ
   | Pi Plicity Name ~Value Closure
   | Lam Plicity Name Closure
   | RowType Value

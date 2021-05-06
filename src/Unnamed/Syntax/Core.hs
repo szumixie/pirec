@@ -14,7 +14,7 @@ data Term
   = Var Level
   | Meta Meta (Maybe BoundMask)
   | Let Name Term Term
-  | U
+  | Univ
   | Pi Plicity Name Term Term
   | Lam Plicity Name Term
   | App Plicity Term Term

@@ -11,7 +11,7 @@ data Term
   | Var Name
   | Hole
   | Let Name (Maybe Term) Term Term
-  | U
+  | Univ
   | Pi Plicity Name (Maybe Term) Term
   | Lam Plicity Name (Maybe Term) Term
   | App Plicity Term Term

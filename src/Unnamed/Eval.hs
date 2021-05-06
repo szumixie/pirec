@@ -44,7 +44,7 @@ eval env t = do
            where
             t = mlookup mx ?: V.meta mx
           Let _ t u -> goEnv (env & Env.extend (go t)) u
-          U -> V.U
+          Univ -> V.Univ
           Pi pl x a b -> V.Pi pl x (go a) (V.Closure env b)
           Lam pl x t -> V.Lam pl x (V.Closure env t)
           App pl t u -> appValuePure mlookup pl (go t) (go u)
@@ -114,7 +114,7 @@ quoteWith quoteVar f = goAcc
                 V.RecordAlter ts spine ->
                   RecordAlter <$> traverse go ts <*> goSpine spine
           goSpine spine
-        V.U -> pure U
+        V.Univ -> pure Univ
         V.Pi pl x a closure -> Pi pl x <$> go a <*> goClosure closure
         V.Lam pl x closure -> Lam pl x <$> goClosure closure
         V.RowType a -> RowType <$> go a

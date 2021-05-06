@@ -37,7 +37,7 @@ prettyTermWith !ctx = go
      where
       args = ctx ^. #env & toListOf (BM.masked mask % to pretty)
     t@Let{} -> prettyLet ctx t
-    U -> "U"
+    Univ -> "U"
     t@(Pi _ "_" _ _) -> parensIf (prec > 0) $ prettyFun ctx t
     t@Pi{} -> parensIf (prec > 0) $ prettyPi ctx t
     t@Lam{} -> parensIf (prec > 0) $ prettyLam ctx t

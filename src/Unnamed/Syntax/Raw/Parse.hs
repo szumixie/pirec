@@ -27,7 +27,7 @@ atom =
           [ R.Var <$> ident
           , R.Hole <$ uscore
           , termLet
-          , R.U <$ univ
+          , R.Univ <$ univ
           , termPi
           , termLam
           , termRowLit

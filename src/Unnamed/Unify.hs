@@ -108,7 +108,7 @@ unify !lvl = go
           solve lvl mx spine $ V.RowLit (MM.difference ts ts')
         (V.Neut (V.Flex mx) spine, t) -> solve lvl mx spine t
         (t, V.Neut (V.Flex mx) spine) -> solve lvl mx spine t
-        (V.U, V.U) -> pass
+        (V.Univ, V.Univ) -> pass
         (V.Pi pl _ a closure, V.Pi pl' _ a' closure') | pl == pl' -> do
           go a a'
           b <- openClosure lvl closure

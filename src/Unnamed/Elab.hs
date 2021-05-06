@@ -59,7 +59,7 @@ checkInfer !ctx = (goCheck, goInfer)
       pure $ Let x t u
     (R.Lam pl x a t, V.Pi pl' _ va' closure) | pl == pl' -> do
       whenJust a \a -> do
-        va <- eval (Ctx.env ctx) =<< goCheck a V.U
+        va <- eval (Ctx.env ctx) =<< goCheck a V.Univ
         elabUnify ctx va va'
       vb <- openClosure (Ctx.level ctx) closure
       Lam pl x <$> check (ctx & Ctx.bind x va') t vb
@@ -81,18 +81,18 @@ checkInfer !ctx = (goCheck, goInfer)
       vt <- eval (Ctx.env ctx) t
       (u, vb) <- infer (ctx & Ctx.extend x va vt) u
       pure (Let x t u, vb)
-    R.U -> pure (U, V.U)
+    R.Univ -> pure (Univ, V.Univ)
     R.Pi pl x a b -> do
       a <- case a of
         Nothing -> insertMeta ctx
-        Just a -> goCheck a V.U
+        Just a -> goCheck a V.Univ
       va <- eval (Ctx.env ctx) a
-      b <- check (ctx & Ctx.bind x va) b V.U
-      pure (Pi pl x a b, V.U)
+      b <- check (ctx & Ctx.bind x va) b V.Univ
+      pure (Pi pl x a b, V.Univ)
     R.Lam pl x a t -> do
       va <- case a of
         Nothing -> insertMetaValue ctx
-        Just a -> eval (Ctx.env ctx) =<< goCheck a V.U
+        Just a -> eval (Ctx.env ctx) =<< goCheck a V.Univ
       (t, vb) <-
         uncurry (insertImplAppNoBeta ctx) =<< infer (ctx & Ctx.bind x va) t
       closure <- closeValue (Ctx.env ctx) vb
@@ -117,8 +117,8 @@ checkInfer !ctx = (goCheck, goInfer)
       vb <- appClosure closure vu
       pure (App pl t u, vb)
     R.RowType a -> do
-      a <- goCheck a V.U
-      pure (RowType a, V.U)
+      a <- goCheck a V.Univ
+      pure (RowType a, V.Univ)
     R.RowEmpty -> do
       va <- insertMetaValue ctx
       pure (RowLit mempty, V.RowType va)
@@ -127,8 +127,8 @@ checkInfer !ctx = (goCheck, goInfer)
       ts <- goCheck ts (V.RowType va)
       pure (RowExt (one (label, t)) ts, V.RowType va)
     R.RecordType r -> do
-      r <- goCheck r (V.RowType V.U)
-      pure (RecordType r, V.U)
+      r <- goCheck r (V.RowType V.Univ)
+      pure (RecordType r, V.Univ)
     R.RecordEmpty -> do
       pure (RecordLit mempty, V.RecordType $ V.RowLit mempty)
     R.RecordExt label a t u -> do
@@ -164,7 +164,7 @@ checkInfer !ctx = (goCheck, goInfer)
   optionalCheck t = \case
     Nothing -> goInfer t
     Just a -> do
-      va <- eval (Ctx.env ctx) =<< goCheck a V.U
+      va <- eval (Ctx.env ctx) =<< goCheck a V.Univ
       traverseToFst (goCheck t) va
 
 insertImplApp ::
