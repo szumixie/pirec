@@ -15,6 +15,7 @@ import Prettyprinter
 import Unnamed.BoundMask qualified as BM
 import Unnamed.Data.MultiMapAlter qualified as MMA
 import Unnamed.Env qualified as Env
+import Unnamed.Plicity (Plicity (..))
 import Unnamed.Syntax.Core (Term (..))
 import Unnamed.Syntax.Core.Pretty.Context (Context)
 import Unnamed.Syntax.Core.Pretty.Context qualified as Ctx
@@ -38,7 +39,7 @@ prettyTermWith !ctx = go
       args = ctx ^. #env & toListOf (BM.masked mask % to pretty)
     t@Let{} -> prettyLet ctx t
     Univ -> "U"
-    t@(Pi _ "_" _ _) -> parensIf (prec > 0) $ prettyFun ctx t
+    t@(Pi Explicit "_" _ _) -> parensIf (prec > 0) $ prettyFun ctx t
     t@Pi{} -> parensIf (prec > 0) $ prettyPi ctx t
     t@Lam{} -> parensIf (prec > 0) $ prettyLam ctx t
     t@App{} -> parensIf (prec > 10) $ u <+> align (sep args)
@@ -57,15 +58,16 @@ prettyTermWith !ctx = go
       ("rec" <>) . align . encloseSep "{ " " }" ", " $
         itoList ts <&> \((x, _), t) -> pretty x <+> colon <+> go 0 t
     RecordProj label index t ->
-      foldr ($) (go 21 t) (replicate index (<> "." <> pretty label))
-        <> dot
-        <> pretty label
+      parensIf (prec > 20) $
+        foldr ($) (go 20 t) (replicate index (<> "." <> pretty label))
+          <> dot
+          <> pretty label
     RecordAlter ts u ->
       ("rec" <>) . align $
         encloseSep
           "{ "
           ( line <> " | "
-              <> foldr (\label -> (<> ".-" <> pretty label)) (go 21 u) restrs
+              <> foldr (\label -> (<> ".-" <> pretty label)) (go 20 u) restrs
               <> " }"
           )
           ", "
@@ -77,7 +79,11 @@ prettyTermWith !ctx = go
             Nothing -> Left x
             Just t -> Right (x, t)
   goApp args = \case
-    App _ t u -> goApp (go 11 u : args) t
+    App pl t u -> goApp (arg : args) t
+     where
+      arg = case pl of
+        Explicit -> go 11 u
+        Implicit -> braces (go 0 u)
     t -> (go 11 t, args)
 
 prettyLet :: Context -> Term -> Doc ann
@@ -93,17 +99,22 @@ prettyPi ctx t = align $ sep [forall_ <+> align (sep binders <+> arrow), u]
  where
   (binders, u) = go ctx t
   go ctx = \case
-    Pi _ (freshName (ctx ^. #names) -> x) a b
-      | x /= "_" ->
+    Pi pl (freshName (ctx ^. #names) -> x) a b
+      | pl == Implicit || x /= "_" ->
         go (ctx & Ctx.extend x) b
-          & _1 %~ (parens (pretty x <+> colon <+> prettyTermWith ctx 0 a) :)
+          & _1 %~ (encl (pretty x <+> colon <+> prettyTermWith ctx 0 a) :)
+     where
+      encl = case pl of
+        Explicit -> parens
+        Implicit -> braces
     t -> ([], prettyTermWith ctx 0 t)
 
 prettyFun :: Context -> Term -> Doc ann
 prettyFun ctx t = align (sep $ go ctx t)
  where
   go ctx = \case
-    Pi _ "_" a b -> prettyTermWith ctx 1 a <+> arrow : go (ctx & Ctx.extend "_") b
+    Pi Explicit "_" a b ->
+      prettyTermWith ctx 1 a <+> arrow : go (ctx & Ctx.extend "_") b
     t -> [prettyTermWith ctx 0 t]
 
 prettyLam :: Context -> Term -> Doc ann
@@ -111,9 +122,12 @@ prettyLam ctx t = align $ sep [lambda <+> align (sep binders <+> arrow), u]
  where
   (binders, u) = go ctx t
   go ctx = \case
-    Lam _ (freshName (ctx ^. #names) -> x) t ->
-      go (ctx & Ctx.extend x) t
-        & _1 %~ (pretty x :)
+    Lam pl (freshName (ctx ^. #names) -> x) t ->
+      go (ctx & Ctx.extend x) t & _1 %~ (encl (pretty x) :)
+     where
+      encl = case pl of
+        Explicit -> id
+        Implicit -> braces
     t -> ([], prettyTermWith ctx 0 t)
 
 parensIf :: Bool -> Doc ann -> Doc ann
