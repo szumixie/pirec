@@ -1,4 +1,4 @@
-module Unnamed.Syntax.Core.Pretty.Context (Context, empty, extend) where
+module Unnamed.Pretty.Context (Context, empty, extend) where
 
 import Relude hiding (empty)
 

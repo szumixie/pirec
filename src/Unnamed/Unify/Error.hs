@@ -12,7 +12,7 @@ import Unnamed.Var.Meta (Meta)
 
 import Unnamed.Effect.Meta
 import Unnamed.Elab.Context (Context)
-import Unnamed.Value.Pretty (prettyValue)
+import Unnamed.Pretty (prettyValue)
 
 data UnifyError
   = Mismatch Value Value

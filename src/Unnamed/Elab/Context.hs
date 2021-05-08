@@ -21,7 +21,7 @@ import Unnamed.BoundMask qualified as BM
 import Unnamed.Data.Span (Span (..))
 import Unnamed.Env (Env)
 import Unnamed.Env qualified as Env
-import Unnamed.Syntax.Core.Pretty.Context qualified as Pretty
+import Unnamed.Pretty.Context qualified as Pretty
 import Unnamed.Value (Value)
 import Unnamed.Value qualified as V
 import Unnamed.Var.Level (Level)

@@ -21,8 +21,8 @@ import Unnamed.Var.Meta (Meta)
 import Unnamed.Var.Name (Name)
 
 import Unnamed.Effect.Meta
+import Unnamed.Pretty (prettyValue)
 import Unnamed.Unify.Error (UnifyError, prettyUnifyError)
-import Unnamed.Value.Pretty (prettyValue)
 
 data ElabErrorType
   = UnifyError Value Value UnifyError

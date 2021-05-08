@@ -19,9 +19,8 @@ import Unnamed.Elab (infer)
 import Unnamed.Elab.Context qualified as Ctx
 import Unnamed.Elab.Error (prettyElabError)
 import Unnamed.Eval (normal)
-import Unnamed.Syntax.Core.Pretty (prettyTerm)
+import Unnamed.Pretty (prettyTerm, prettyValue)
 import Unnamed.Syntax.Raw.Parse (parseRaw)
-import Unnamed.Value.Pretty (prettyValue)
 
 newtype Options = Options FilePath
   deriving stock (Show)

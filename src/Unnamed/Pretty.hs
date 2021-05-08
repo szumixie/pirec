@@ -1,6 +1,6 @@
-module Unnamed.Syntax.Core.Pretty (
+module Unnamed.Pretty (
   prettyTerm,
-  prettyTermWith,
+  prettyValue,
 ) where
 
 import Relude hiding (group)
@@ -9,21 +9,31 @@ import Data.Char (isDigit)
 import Data.Text.Read qualified as Text
 import Data.Text.Short qualified as TS
 
+import Control.Effect
 import Optics
 import Prettyprinter
 
 import Unnamed.BoundMask qualified as BM
 import Unnamed.Data.MultiMapAlter qualified as MMA
+import Unnamed.Elab.Context qualified as Elab
 import Unnamed.Env qualified as Env
 import Unnamed.Plicity (Plicity (..))
+import Unnamed.Pretty.Context (Context)
+import Unnamed.Pretty.Context qualified as Ctx
 import Unnamed.Syntax.Core (Term (..))
-import Unnamed.Syntax.Core.Pretty.Context (Context)
-import Unnamed.Syntax.Core.Pretty.Context qualified as Ctx
+import Unnamed.Value (Value)
 import Unnamed.Var.Level (Level (..))
 import Unnamed.Var.Name (Name (..))
 
+import Unnamed.Effect.Meta (MetaLookup)
+import Unnamed.Eval (quote)
+
 prettyTerm :: Term -> Doc ann
 prettyTerm = prettyTermWith Ctx.empty 0
+
+prettyValue :: Eff MetaLookup m => Elab.Context -> Value -> m (Doc ann)
+prettyValue ctx =
+  fmap (prettyTermWith (Elab.prettyCtx ctx) 0) . quote (Elab.level ctx)
 
 prettyTermWith :: Context -> Int -> Term -> Doc ann
 prettyTermWith !ctx = go
