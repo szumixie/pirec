@@ -1,4 +1,4 @@
-Eq : ∀ {A} → A → A → U = λ {A} x y → ∀ (P : A → U) → P x → P y
+Eq : ∀ {A} → A → A → Type = λ {A} x y → ∀ (P : A → Type) → P x → P y
 refl : ∀ {A} {x : A} → Eq x x = λ _ px → px
 Nat = ∀ {A} → Rec #{ z : A; s : A → A } → A
 0 : Nat = λ r → r.z
