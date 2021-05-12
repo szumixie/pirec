@@ -57,15 +57,16 @@ spec = parallel do
     traverse (traverse validToList) (RList.uncons (fromList xs))
       === Just (uncons xs)
   describe "Ixed" do
-    specify "matching" $ hedgehog do
-      xs <- forAll $ list 1000 int
-      i <- forAll $ G.int (R.constant 0 (length xs - 1))
-      matching (ix i) (fromList xs) === matching (ix i) xs
-    specify "set" $ hedgehog do
-      x <- forAll int
-      xs <- forAll $ list 1000 int
-      i <- forAll $ G.int (R.constant 0 (length xs - 1))
-      validToList (set (ix i) x (fromList xs)) === Just (set (ix i) x xs)
+    describe "ix" do
+      specify "preview" $ hedgehog do
+        xs <- forAll $ list 1000 int
+        i <- forAll $ G.int (R.linear 0 1000)
+        preview (ix i) (fromList @(RList Int) xs) === preview (ix i) xs
+      specify "set" $ hedgehog do
+        x <- forAll int
+        xs <- forAll $ list 1000 int
+        i <- forAll $ G.int (R.linear 0 1000)
+        validToList (set (ix i) x (fromList xs)) === Just (set (ix i) x xs)
   describe "FunctorWithIndex" do
     specify "imap" $ hedgehog do
       xs <- forAll $ list 1000 int
