@@ -3,6 +3,7 @@ module Unnamed.Data.MultiMap (
   match,
   difference,
   superDifference,
+  valid,
 ) where
 
 import Relude
@@ -12,15 +13,19 @@ import Data.HashMap.Strict qualified as M
 import Data.Sequence qualified as Seq
 import Data.These
 import Data.These.Optics
+import GHC.Exts qualified
 
 import Optics
 
 newtype MultiMap k a = MultiMap (HashMap k (Seq a))
-  deriving newtype (Show)
+  deriving newtype (Show, Eq)
   deriving stock (Functor, Foldable, Traversable)
   deriving
     (FunctorWithIndex (k, Int), FoldableWithIndex (k, Int), Semialign, Align)
     via (Compose (HashMap k) Seq)
+
+valid :: MultiMap k a -> Bool
+valid (MultiMap xs) = not $ any null xs
 
 instance TraversableWithIndex (k, Int) (MultiMap k) where
   itraverse f =
@@ -35,6 +40,11 @@ instance (Eq k, Hashable k) => Monoid (MultiMap k a) where
 instance Hashable k => One (MultiMap k a) where
   type OneItem (MultiMap k a) = (k, a)
   one (k, a) = MultiMap $ one (k, one a)
+
+instance (Eq k, Hashable k) => IsList (MultiMap k a) where
+  type Item (MultiMap k a) = (k, a)
+  fromList = foldl' (\xs x -> xs <> one x) mempty
+  toList = fmap (_1 %~ fst) . itoList
 
 type instance Index (MultiMap k a) = (k, Int)
 type instance IxValue (MultiMap k a) = a
@@ -60,10 +70,10 @@ elemDifference = \case
     GT -> Just . Just $ Seq.drop (length ys) xs
 
 difference :: (Eq k, Hashable k) => MultiMap k a -> MultiMap k b -> MultiMap k a
-difference (MultiMap mx) (MultiMap my) =
-  MultiMap $ M.mapMaybe (join . elemDifference) (align mx my)
+difference (MultiMap xs) (MultiMap ys) =
+  MultiMap $ M.mapMaybe (join . elemDifference) (align xs ys)
 
 superDifference ::
   (Eq k, Hashable k) => MultiMap k a -> MultiMap k b -> Maybe (MultiMap k a)
-superDifference (MultiMap mx) (MultiMap my) =
-  MultiMap . M.mapMaybe id <$> traverse elemDifference (align mx my)
+superDifference (MultiMap xs) (MultiMap ys) =
+  MultiMap . M.mapMaybe id <$> traverse elemDifference (align xs ys)
