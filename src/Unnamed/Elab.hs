@@ -1,14 +1,15 @@
 module Unnamed.Elab (check, infer) where
 
-import Relude
+import Relude hiding (Reader, ask, asks, local)
 import Relude.Extra.Tuple (traverseToFst)
 
 import Control.Effect
 import Control.Effect.Error
+import Control.Effect.Reader
 import Optics
 
 import Unnamed.Data.MultiMapAlter qualified as MMA
-import Unnamed.Plicity
+import Unnamed.Plicity (Plicity (..))
 import Unnamed.Syntax.Core (Term (..))
 import Unnamed.Syntax.Raw qualified as R
 import Unnamed.Value (Value)
@@ -21,99 +22,104 @@ import Unnamed.Elab.Error
 import Unnamed.Eval
 import Unnamed.Unify (unify)
 
-insertMeta :: Eff MetaState m => Context -> m Term
-insertMeta ctx = do
-  meta <- freshMeta
-  pure $ Meta meta (Just $ Ctx.boundMask ctx)
+insertMeta :: Effs '[MetaState, Ask Context] m => m Term
+insertMeta = Meta <$> freshMeta <*> (Just <$> asks Ctx.boundMask)
 
-insertMetaValue :: Eff MetaCtx m => Context -> m Value
-insertMetaValue ctx = eval (Ctx.env ctx) =<< insertMeta ctx
+elabEval :: Effs '[MetaLookup, Ask Context] m => Term -> m Value
+elabEval t = asks Ctx.env >>= \env -> eval env t
+
+elabThrow :: Effs [Throw ElabError, Ask Context] m => ElabErrorType -> m a
+elabThrow err = ask >>= \ctx -> throw $ ElabError ctx err
 
 elabUnify ::
-  Effs [MetaCtx, Throw ElabError] m => Context -> Value -> Value -> m ()
-elabUnify ctx t t' =
+  Effs [MetaCtx, Throw ElabError, Ask Context] m => Value -> Value -> m ()
+elabUnify t t' = do
+  ctx <- ask
   throwToThrow (ElabError ctx . UnifyError t t') $
     unify (Ctx.level ctx) t t'
 
 check ::
-  Effs [MetaCtx, Throw ElabError] m => Context -> R.Term -> Value -> m Term
-check !ctx = curry \case
-  (R.Span span t, a) -> check (ctx & Ctx.span .~ span) t a
-  (R.Hole, _) -> insertMeta ctx
-  (R.Let x a t u, vb) -> do
-    (t, va) <- optionalCheck ctx t a
-    vt <- eval (Ctx.env ctx) t
-    u <- check (ctx & Ctx.extend x va vt) u vb
-    pure $ Let x t u
-  (R.Lam pl x a t, V.Pi pl' _ va' closure) | pl == pl' -> do
-    whenJust a \a -> do
-      va <- eval (Ctx.env ctx) =<< check ctx a V.Univ
-      elabUnify ctx va va'
-    vb <- openClosure (Ctx.level ctx) closure
-    Lam pl x <$> check (ctx & Ctx.bind x va') t vb
-  (t, V.Pi Implicit x _ closure) -> do
-    vb <- openClosure (Ctx.level ctx) closure
-    Lam Implicit x <$> check (ctx & Ctx.insert x) t vb
-  (t, va') -> do
-    (t, va) <- uncurry (insertImplAppNoBeta ctx) =<< infer ctx t
-    t <$ elabUnify ctx va va'
+  Effs [MetaCtx, Throw ElabError, Reader Context] m => R.Term -> Value -> m Term
+check = fst checkInfer
 
 infer ::
-  Effs [MetaCtx, Throw ElabError] m => Context -> R.Term -> m (Term, Value)
-infer !ctx = goInfer
+  Effs [MetaCtx, Throw ElabError, Reader Context] m => R.Term -> m (Term, Value)
+infer = snd checkInfer
+
+checkInfer ::
+  Effs [MetaCtx, Throw ElabError, Reader Context] m =>
+  (R.Term -> Value -> m Term, R.Term -> m (Term, Value))
+checkInfer = (goCheck, goInfer)
  where
-  goCheck = check ctx
+  goCheck = curry \case
+    (R.Span span t, va) -> local (Ctx.span .~ span) (goCheck t va)
+    (R.Hole, _) -> insertMeta
+    (R.Let x a t u, vb) -> do
+      (t, va) <- optionalCheck t a
+      vt <- elabEval t
+      u <- local (Ctx.extend x va vt) (goCheck u vb)
+      pure $ Let x t u
+    (R.Lam pl x a t, V.Pi pl' _ va' closure) | pl == pl' -> do
+      whenJust a \a -> do
+        va <- elabEval =<< goCheck a V.Univ
+        elabUnify va va'
+      vb <- asks Ctx.level >>= \lvl -> openClosure lvl closure
+      Lam pl x <$> local (Ctx.bind x va') (goCheck t vb)
+    (t, V.Pi Implicit x _ closure) -> do
+      vb <- asks Ctx.level >>= \lvl -> openClosure lvl closure
+      Lam Implicit x <$> local (Ctx.insert x) (goCheck t vb)
+    (t, va') -> do
+      (t, va) <- uncurry insertImplAppNoBeta =<< goInfer t
+      t <$ elabUnify va va'
+
   goInfer = \case
-    R.Span span t -> infer (ctx & Ctx.span .~ span) t
-    R.Var x -> case ctx & Ctx.getName x of
-      Nothing -> throw $ ElabError ctx (ScopeError x)
-      Just (lx, va) -> pure (Var lx, va)
-    R.Hole -> (,) <$> insertMeta ctx <*> insertMetaValue ctx
+    R.Span span t -> local (Ctx.span .~ span) (goInfer t)
+    R.Var x ->
+      asks (Ctx.getName x) >>= \case
+        Nothing -> elabThrow $ ScopeError x
+        Just (lx, va) -> pure (Var lx, va)
+    R.Hole -> (,) <$> insertMeta <*> (elabEval =<< insertMeta)
     R.Let x a t u -> do
-      (t, va) <- optionalCheck ctx t a
-      vt <- eval (Ctx.env ctx) t
-      (u, vb) <- infer (ctx & Ctx.extend x va vt) u
+      (t, va) <- optionalCheck t a
+      vt <- elabEval t
+      (u, vb) <- local (Ctx.extend x va vt) (goInfer u)
       pure (Let x t u, vb)
     R.Univ -> pure (Univ, V.Univ)
     R.Pi pl x a b -> do
-      a <- case a of
-        Nothing -> insertMeta ctx
-        Just a -> goCheck a V.Univ
-      va <- eval (Ctx.env ctx) a
-      b <- check (ctx & Ctx.bind x va) b V.Univ
+      a <- optionalType a
+      va <- elabEval a
+      b <- local (Ctx.bind x va) (goCheck b V.Univ)
       pure (Pi pl x a b, V.Univ)
     R.Lam pl x a t -> do
-      va <- case a of
-        Nothing -> insertMetaValue ctx
-        Just a -> eval (Ctx.env ctx) =<< goCheck a V.Univ
-      (t, vb) <-
-        uncurry (insertImplAppNoBeta ctx) =<< infer (ctx & Ctx.bind x va) t
-      closure <- closeValue (Ctx.env ctx) vb
+      va <- elabEval =<< optionalType a
+      (t, vb) <- uncurry insertImplAppNoBeta =<< local (Ctx.bind x va) (goInfer t)
+      closure <- asks Ctx.env >>= \env -> closeValue env vb
       pure (Lam pl x t, V.Pi pl x va closure)
     R.App pl t u -> do
       (t, vp) <- case pl of
-        Explicit -> uncurry (insertImplApp ctx) =<< goInfer t
+        Explicit -> uncurry insertImplApp =<< goInfer t
         Implicit -> goInfer t
       (va, closure) <-
         forceValue vp >>= \case
           V.Pi pl' _ va closure
             | pl' == pl -> pure (va, closure)
-            | otherwise -> throw $ ElabError ctx (PlicityMismatch pl pl')
+            | otherwise -> elabThrow $ PlicityMismatch pl pl'
           vp -> do
-            va <- insertMetaValue ctx
+            va <- elabEval =<< insertMeta
             closure <-
-              V.Closure (Ctx.env ctx) <$> insertMeta (ctx & Ctx.bind "v" va)
-            elabUnify ctx vp $ V.Pi pl "v" va closure
+              asks Ctx.env >>= \env ->
+                V.Closure env <$> local (Ctx.bind "v" va) insertMeta
+            elabUnify vp (V.Pi pl "v" va closure)
             pure (va, closure)
       u <- goCheck u va
-      vu <- eval (Ctx.env ctx) u
+      vu <- elabEval u
       vb <- appClosure closure vu
       pure (App pl t u, vb)
     R.RowType a -> do
       a <- goCheck a V.Univ
       pure (RowType a, V.Univ)
     R.RowEmpty -> do
-      va <- insertMetaValue ctx
+      va <- elabEval =<< insertMeta
       pure (RowLit mempty, V.RowType va)
     R.RowExt label t ts -> do
       (t, va) <- goInfer t
@@ -125,10 +131,10 @@ infer !ctx = goInfer
     R.RecordEmpty -> do
       pure (RecordLit mempty, V.RecordType $ V.RowLit mempty)
     R.RecordExt label a t u -> do
-      (t, va) <- optionalCheck ctx t a
+      (t, va) <- optionalCheck t a
       (u, vp) <- goInfer u
-      vr <- insertMetaValue ctx
-      elabUnify ctx vp $ V.RecordType vr
+      vr <- elabEval =<< insertMeta
+      elabUnify vp (V.RecordType vr)
       pure
         ( RecordAlter (MMA.singleInsert label t) u
         , V.RecordType (V.rowExt (one (label, va)) vr)
@@ -142,51 +148,47 @@ infer !ctx = goInfer
           V.RecordType (V.Neut _ (V.RowExt vas _))
             | Just va <- vas ^? ix (label, 0) -> pure va
           vp -> do
-            va <- insertMetaValue ctx
-            vr <- insertMetaValue ctx
-            elabUnify ctx vp $ V.RecordType (V.rowExt (one (label, va)) vr)
+            va <- elabEval =<< insertMeta
+            vr <- elabEval =<< insertMeta
+            elabUnify vp $ V.RecordType (V.rowExt (one (label, va)) vr)
             pure va
       pure (RecordProj label 0 t, va)
     R.RecordRestr label t -> do
       (t, vp) <- goInfer t
-      va <- insertMetaValue ctx
-      vr <- insertMetaValue ctx
-      elabUnify ctx vp $ V.RecordType (V.rowExt (one (label, va)) vr)
+      va <- elabEval =<< insertMeta
+      vr <- elabEval =<< insertMeta
+      elabUnify vp $ V.RecordType (V.rowExt (one (label, va)) vr)
       pure (RecordAlter (MMA.singleDelete label) t, V.RecordType vr)
 
-optionalCheck ::
-  Effs [MetaCtx, Throw ElabError] m =>
-  Context ->
-  R.Term ->
-  Maybe R.Term ->
-  m (Term, Value)
-optionalCheck ctx t = \case
-  Nothing -> infer ctx t
-  Just a -> do
-    va <- eval (Ctx.env ctx) =<< check ctx a V.Univ
-    traverseToFst (check ctx t) va
+  optionalCheck t = \case
+    Nothing -> goInfer t
+    Just a -> do
+      va <- elabEval =<< goCheck a V.Univ
+      traverseToFst (goCheck t) va
+
+  optionalType = \case
+    Nothing -> insertMeta
+    Just a -> goCheck a V.Univ
 
 insertImplApp ::
-  Effs [MetaCtx, Throw ElabError] m =>
-  Context ->
+  Effs [MetaCtx, Throw ElabError, Ask Context] m =>
   Term ->
   Value ->
   m (Term, Value)
-insertImplApp ctx = go
+insertImplApp = go
  where
   go t =
     forceValue >=> \case
       V.Pi Implicit _ _ closure -> do
-        u <- insertMeta ctx
-        go (App Implicit t u) =<< appClosure closure =<< eval (Ctx.env ctx) u
+        u <- insertMeta
+        go (App Implicit t u) =<< appClosure closure =<< elabEval u
       va -> pure (t, va)
 
 insertImplAppNoBeta ::
-  Effs [MetaCtx, Throw ElabError] m =>
-  Context ->
+  Effs [MetaCtx, Throw ElabError, Ask Context] m =>
   Term ->
   Value ->
   m (Term, Value)
-insertImplAppNoBeta ctx t va = case t of
+insertImplAppNoBeta t va = case t of
   Lam Implicit _ _ -> pure (t, va)
-  _ -> insertImplApp ctx t va
+  _ -> insertImplApp t va

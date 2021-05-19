@@ -1,6 +1,6 @@
 module Unnamed (main) where
 
-import Relude
+import Relude hiding (runReader)
 
 import Data.Text.IO.Utf8 qualified as Utf8
 import Main.Utf8 (withUtf8)
@@ -8,6 +8,7 @@ import System.IO (hPutStr)
 
 import Control.Effect
 import Control.Effect.Error
+import Control.Effect.Reader
 import Options.Applicative
 import Prettyprinter ((<+>))
 import Prettyprinter qualified as PP
@@ -37,7 +38,7 @@ main = withUtf8 do
     Left err -> hPutStr stderr (MP.errorBundlePretty err) *> exitFailure
   runM $ metaCtxToIO do
     (t, a) <-
-      errorToIO (infer Ctx.empty raw) >>= \case
+      errorToIO (runReader Ctx.empty $ infer raw) >>= \case
         Right ta -> pure ta
         Left err -> do
           perr <- prettyElabError err fp input
