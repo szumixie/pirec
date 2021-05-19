@@ -6,6 +6,7 @@ module Unnamed.Data.MultiMapAlter (
   lookup,
   match,
   ifoldedAlter,
+  valid,
 ) where
 
 import Relude
@@ -21,7 +22,7 @@ import Optics
 import Unnamed.Data.MultiMap (MultiMap (..))
 
 data ElemAlter a = ElemAlter Int (Seq a)
-  deriving stock (Show, Functor, Foldable, Traversable)
+  deriving stock (Show, Eq, Functor, Foldable, Traversable)
 
 instance Semigroup (ElemAlter a) where
   ElemAlter i xs <> ElemAlter j ys = ElemAlter (i' + j) (xs <> ys')
@@ -47,8 +48,11 @@ elemDrop i xs = case i `compare` length xs of
   GT -> elemDelete (i - length xs)
 
 newtype MultiMapAlter k a = MultiMapAlter (HashMap k (ElemAlter a))
-  deriving newtype (Show)
+  deriving newtype (Show, Eq)
   deriving stock (Functor, Foldable, Traversable)
+
+valid :: MultiMapAlter k a -> Bool
+valid (MultiMapAlter m) = not $ any elemIsId m
 
 instance (Eq k, Hashable k) => Semigroup (MultiMapAlter k a) where
   MultiMapAlter mx <> MultiMapAlter my =
