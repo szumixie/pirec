@@ -53,11 +53,8 @@ instance Traversable Trees where
 
 instance Foldable RList where
   foldMap f (RList _ ts) = foldMap f ts
-  {-# INLINE foldMap #-}
   null (RList s _) = s == 0
-  {-# INLINE null #-}
   length (RList s _) = s
-  {-# INLINE length #-}
 
 validTree :: Tree a -> Bool
 validTree = \case
@@ -95,9 +92,11 @@ uncons (RList s ts) = case ts of
 
 instance AsEmpty (RList a) where
   _Empty = prism' (const empty) (null >>> bool Nothing (Just ()))
+  {-# INLINE _Empty #-}
 
 instance Cons (RList a) (RList b) a b where
   _Cons = prism (uncurry cons) (uncons >>> maybeToRight empty)
+  {-# INLINE _Cons #-}
 
 instance IsList (RList a) where
   type Item (RList a) = a
@@ -205,12 +204,10 @@ itraverseTree f = go
 instance FunctorWithIndex Int RList where
   imap :: forall a b. (Int -> a -> b) -> RList a -> RList b
   imap = coerce $ itraverse @_ @RList @Identity @a @b
-  {-# INLINE imap #-}
 
 instance FoldableWithIndex Int RList where
   ifoldMap :: forall m a. Monoid m => (Int -> a -> m) -> RList a -> m
   ifoldMap = coerce $ itraverse @_ @RList @(Const m) @a
-  {-# INLINE ifoldMap #-}
 
 instance TraversableWithIndex Int RList where
   itraverse f (RList s ts) = RList s <$> go 0 ts

@@ -16,3 +16,4 @@ declareFieldLabels
 length :: Lens' Span Int
 length = lensVL \f (Span start end) ->
   Span start . (+ start) <$> f (end - start)
+{-# INLINE length #-}

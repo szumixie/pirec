@@ -29,6 +29,7 @@ data MetaLookup :: Effect where
 
 metaLookup :: Eff MetaLookup m => m (Meta -> Maybe Value)
 metaLookup = send MetaLookup
+{-# INLINE metaLookup #-}
 
 data MetaState :: Effect where
   FreshMeta :: MetaState m Meta
@@ -36,9 +37,11 @@ data MetaState :: Effect where
 
 freshMeta :: Eff MetaState m => m Meta
 freshMeta = send FreshMeta
+{-# INLINE freshMeta #-}
 
 solveMeta :: Eff MetaState m => Meta -> Value -> m ()
 solveMeta m vt = send $ SolveMeta m vt
+{-# INLINE solveMeta #-}
 
 type MetaCtx = Bundle [MetaLookup, MetaState]
 
@@ -46,6 +49,7 @@ runMetaLookup ::
   Carrier m => (Meta -> Maybe Value) -> InterpreterFor MetaLookup m
 runMetaLookup mlookup = interpret \case
   MetaLookup -> pure mlookup
+{-# INLINE runMetaLookup #-}
 
 type MetaLookupC s = InterpretC (ViaReifiedH s) MetaLookup
 type MetaStateC s = InterpretC (ViaReifiedH s) MetaState
@@ -71,3 +75,4 @@ metaCtxToIO m = do
       \case
         MetaLookup -> pure $ unsafeDupablePerformIO . HT.lookup solveds
       m
+{-# INLINE metaCtxToIO #-}

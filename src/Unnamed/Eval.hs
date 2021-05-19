@@ -122,6 +122,7 @@ quoteWith quoteVar f = goAcc
         V.RecordType row -> RecordType <$> go row
         V.RecordLit ts -> RecordLit <$> traverse go ts
     goClosure closure = goAcc (f lvl acc) (lvl + 1) =<< openClosure lvl closure
+{-# INLINE quoteWith #-}
 
 quote :: Eff MetaLookup m => Level -> Value -> m Term
 quote = quoteWith go (\_ _ -> ()) ()

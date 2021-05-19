@@ -51,6 +51,7 @@ type instance IxValue (MultiMap k a) = a
 
 instance (Eq k, Hashable k) => Ixed (MultiMap k a) where
   ix (k, i) = coercedTo @(HashMap k (Seq a)) % ix k % ix i
+  {-# INLINE ix #-}
 
 match ::
   (Eq k, Hashable k) =>

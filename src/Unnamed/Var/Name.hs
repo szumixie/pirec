@@ -13,6 +13,7 @@ newtype Name = Name ShortText
 
 _Name :: Iso' Name Text
 _Name = coerced % iso TS.toText TS.fromText
+{-# INLINE _Name #-}
 
 instance Pretty Name where
   pretty = pretty . view _Name
