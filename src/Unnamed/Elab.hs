@@ -37,39 +37,32 @@ elabUnify ctx t t' =
 
 check ::
   Effs [MetaCtx, Throw ElabError] m => Context -> R.Term -> Value -> m Term
-check = fst . checkInfer
+check !ctx = curry \case
+  (R.Span span t, a) -> check (ctx & Ctx.span .~ span) t a
+  (R.Hole, _) -> insertMeta ctx
+  (R.Let x a t u, vb) -> do
+    (t, va) <- optionalCheck ctx t a
+    vt <- eval (Ctx.env ctx) t
+    u <- check (ctx & Ctx.extend x va vt) u vb
+    pure $ Let x t u
+  (R.Lam pl x a t, V.Pi pl' _ va' closure) | pl == pl' -> do
+    whenJust a \a -> do
+      va <- eval (Ctx.env ctx) =<< check ctx a V.Univ
+      elabUnify ctx va va'
+    vb <- openClosure (Ctx.level ctx) closure
+    Lam pl x <$> check (ctx & Ctx.bind x va') t vb
+  (t, V.Pi Implicit x _ closure) -> do
+    vb <- openClosure (Ctx.level ctx) closure
+    Lam Implicit x <$> check (ctx & Ctx.insert x) t vb
+  (t, va') -> do
+    (t, va) <- uncurry (insertImplAppNoBeta ctx) =<< infer ctx t
+    t <$ elabUnify ctx va va'
 
 infer ::
   Effs [MetaCtx, Throw ElabError] m => Context -> R.Term -> m (Term, Value)
-infer = snd . checkInfer
-
-checkInfer ::
-  Effs [MetaCtx, Throw ElabError] m =>
-  Context ->
-  (R.Term -> Value -> m Term, R.Term -> m (Term, Value))
-checkInfer !ctx = (goCheck, goInfer)
+infer !ctx = goInfer
  where
-  goCheck = curry \case
-    (R.Span span t, a) -> check (ctx & Ctx.span .~ span) t a
-    (R.Hole, _) -> insertMeta ctx
-    (R.Let x a t u, vb) -> do
-      (t, va) <- optionalCheck t a
-      vt <- eval (Ctx.env ctx) t
-      u <- check (ctx & Ctx.extend x va vt) u vb
-      pure $ Let x t u
-    (R.Lam pl x a t, V.Pi pl' _ va' closure) | pl == pl' -> do
-      whenJust a \a -> do
-        va <- eval (Ctx.env ctx) =<< goCheck a V.Univ
-        elabUnify ctx va va'
-      vb <- openClosure (Ctx.level ctx) closure
-      Lam pl x <$> check (ctx & Ctx.bind x va') t vb
-    (t, V.Pi Implicit x _ closure) -> do
-      vb <- openClosure (Ctx.level ctx) closure
-      Lam Implicit x <$> check (ctx & Ctx.insert x) t vb
-    (t, va') -> do
-      (t, va) <- uncurry (insertImplAppNoBeta ctx) =<< goInfer t
-      t <$ elabUnify ctx va va'
-
+  goCheck = check ctx
   goInfer = \case
     R.Span span t -> infer (ctx & Ctx.span .~ span) t
     R.Var x -> case ctx & Ctx.getName x of
@@ -77,7 +70,7 @@ checkInfer !ctx = (goCheck, goInfer)
       Just (lx, va) -> pure (Var lx, va)
     R.Hole -> (,) <$> insertMeta ctx <*> insertMetaValue ctx
     R.Let x a t u -> do
-      (t, va) <- optionalCheck t a
+      (t, va) <- optionalCheck ctx t a
       vt <- eval (Ctx.env ctx) t
       (u, vb) <- infer (ctx & Ctx.extend x va vt) u
       pure (Let x t u, vb)
@@ -132,7 +125,7 @@ checkInfer !ctx = (goCheck, goInfer)
     R.RecordEmpty -> do
       pure (RecordLit mempty, V.RecordType $ V.RowLit mempty)
     R.RecordExt label a t u -> do
-      (t, va) <- optionalCheck t a
+      (t, va) <- optionalCheck ctx t a
       (u, vp) <- goInfer u
       vr <- insertMetaValue ctx
       elabUnify ctx vp $ V.RecordType vr
@@ -161,11 +154,17 @@ checkInfer !ctx = (goCheck, goInfer)
       elabUnify ctx vp $ V.RecordType (V.rowExt (one (label, va)) vr)
       pure (RecordAlter (MMA.singleDelete label) t, V.RecordType vr)
 
-  optionalCheck t = \case
-    Nothing -> goInfer t
-    Just a -> do
-      va <- eval (Ctx.env ctx) =<< goCheck a V.Univ
-      traverseToFst (goCheck t) va
+optionalCheck ::
+  Effs [MetaCtx, Throw ElabError] m =>
+  Context ->
+  R.Term ->
+  Maybe R.Term ->
+  m (Term, Value)
+optionalCheck ctx t = \case
+  Nothing -> infer ctx t
+  Just a -> do
+    va <- eval (Ctx.env ctx) =<< check ctx a V.Univ
+    traverseToFst (check ctx t) va
 
 insertImplApp ::
   Effs [MetaCtx, Throw ElabError] m =>
