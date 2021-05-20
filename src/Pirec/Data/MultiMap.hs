@@ -32,7 +32,7 @@ instance TraversableWithIndex (k, Int) (MultiMap k) where
     fmap (coerce @(Compose (HashMap _) Seq _)) . itraverse f . coerce
 
 instance (Eq k, Hashable k) => Semigroup (MultiMap k a) where
-  MultiMap xs <> MultiMap ys = MultiMap $ M.unionWith (<>) xs ys
+  (<>) = coerce $ M.unionWith @k @(Seq a) (<>)
 
 instance (Eq k, Hashable k) => Monoid (MultiMap k a) where
   mempty = MultiMap mempty

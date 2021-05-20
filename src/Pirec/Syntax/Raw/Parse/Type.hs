@@ -1,4 +1,4 @@
-module Pirec.Syntax.Raw.Parse.Type (ParseState, Parser, run) where
+module Pirec.Syntax.Raw.Parse.Type (Parser, run) where
 
 import Relude
 

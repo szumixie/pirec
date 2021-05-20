@@ -37,7 +37,7 @@ prettyTermWith !ctx = go
  where
   go !prec = \case
     Var lx@(Level n) ->
-      ctx ^. #env & Env.index lx & maybe ("v" <> dot <> pretty n) pretty
+      ctx ^. #env & Env.index lx & maybe (dot <> pretty n) pretty
     Meta mx Nothing -> pretty mx
     Meta mx (Just mask)
       | null args -> pretty mx
