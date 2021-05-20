@@ -1,7 +1,7 @@
-name: unnamed
+name: pirec
 version: 0.0.0
 author: Szumi Xie <szumixie@gmail.com>
-github: szumixie/unnamed
+github: szumixie/pirec
 
 extra-doc-files:
   - README.md
@@ -112,7 +112,7 @@ dependencies:
 
 _no-paths: &no-paths
   condition: false
-  other-modules: Paths_unnamed
+  other-modules: Paths_pirec
 
 _exe-options: &exe-options
   main: Main.hs
@@ -121,7 +121,7 @@ _exe-options: &exe-options
     - -rtsopts
     - -with-rtsopts=-N
   dependencies:
-    - unnamed
+    - pirec
 
 library:
   source-dirs: src
@@ -132,14 +132,14 @@ library:
         - -Wunused-packages
 
 executables:
-  unnamed:
+  pirec:
     source-dirs: app
     <<: *exe-options
     when:
       - *no-paths
 
 tests:
-  test-unnamed:
+  test-pirec:
     source-dirs: test
     <<: *exe-options
     when:
@@ -152,7 +152,7 @@ tests:
           - hedgehog
 
 benchmarks:
-  bench-unnamed:
+  bench-pirec:
     source-dirs: benchmark
     <<: *exe-options
     when:

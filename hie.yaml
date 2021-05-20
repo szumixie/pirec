@@ -1,10 +1,10 @@
 cradle:
   stack:
     - path: ./src
-      component: unnamed:lib
+      component: pirec:lib
     - path: ./app
-      component: unnamed:exe:unnamed
+      component: pirec:exe:pirec
     - path: ./test
-      component: unnamed:test:test-unnamed
+      component: pirec:test:test-pirec
     - path: ./benchmark
-      component: unnamed:bench:bench-unnamed
+      component: pirec:bench:bench-pirec

@@ -1,3 +1,3 @@
 module Main (main) where
 
-import Unnamed (main)
+import Pirec (main)
