@@ -1,12 +1,15 @@
 module Pirec.Syntax.Raw.Parse (parseRaw) where
 
 import Relude hiding (many, some)
+import Relude.Extra.Enum (next)
 
 import Optics
 import Text.Megaparsec hiding (State)
 
 import Pirec.Data.Span
 import Pirec.Plicity (Plicity (..))
+import Pirec.Syntax.Precedence (Precedence)
+import Pirec.Syntax.Precedence qualified as P
 import Pirec.Syntax.Raw qualified as R
 import Pirec.Syntax.Raw.Parse.Lex
 import Pirec.Syntax.Raw.Parse.Type
@@ -16,50 +19,50 @@ parseRaw :: String -> Text -> Either (ParseErrorBundle Text Void) R.Term
 parseRaw = run $ space *> termLetBlock <* eof
 
 term :: Parser R.Term
-term = atom & termRecordSuffix & termApp & termFun
+term = termPrec minBound
 
-atom :: Parser R.Term
-atom =
-  choice
-    [ parens term
-    , withSpan $
-        choice
-          [ R.Var <$> ident
-          , R.Hole <$ uscore
-          , termLet
-          , R.Univ <$ univ
-          , termPi
-          , termLam
-          , termRowLit
-          , termRecordLit
-          ]
-    ]
-    <?> "expression"
-
-termFun :: Parser R.Term -> Parser R.Term
-termFun p = go
- where
-  go = withSpan do
-    t <- p
-    option t $ R.Pi Explicit "_" (Just t) <$ arrow <*> go
-
-termApp :: Parser R.Term -> Parser R.Term
-termApp p = suffixes fun $ do
-  (pl, u) <- braces ((Implicit,) <$> term) <|> (Explicit,) <$> p
-  pure \t -> R.App pl t u
- where
-  fun =
+termPrec :: Precedence -> Parser R.Term
+termPrec !prec = label "expression" case prec of
+  P.Atom ->
     choice
-      [ withSpan . hidden $
-          R.RowType <$ rowType <*> p <|> R.RecordType <$ recordType <*> p
-      , p
+      [ parens term
+      , withSpan $
+          choice
+            [ R.Var <$> ident
+            , R.Hole <$ uscore
+            , termLet
+            , R.Univ <$ univ
+            , termPi
+            , termLam
+            , termRowLit
+            , termRecordLit
+            ]
       ]
-
-termRecordSuffix :: Parser R.Term -> Parser R.Term
-termRecordSuffix p =
-  suffixes p . label "record projection" $
-    R.RecordRestr <$ dotminus <*> fieldLabel
-      <|> R.RecordProj <$ dot <*> fieldLabel
+  P.Proj ->
+    suffixes (termPrec $ next prec) . label "record projection" $
+      choice
+        [ R.RecordRestr <$ dotminus <*> fieldLabel
+        , R.RecordProj <$ dot <*> fieldLabel
+        ]
+  P.App -> suffixes fun do
+    (pl, u) <-
+      braces ((Implicit,) <$> term) <|> (Explicit,) <$> termPrec (next prec)
+    pure \t -> R.App pl t u
+   where
+    fun =
+      choice
+        [ withSpan $
+            choice
+              [ R.RowType <$ rowType <*> termPrec (next prec)
+              , R.RecordType <$ recordType <*> termPrec (next prec)
+              ]
+        , termPrec (next prec)
+        ]
+  P.Arrow -> go
+   where
+    go = withSpan do
+      t <- termPrec (next prec)
+      option t $ R.Pi Explicit "_" (Just t) <$ arrow <*> go
 
 termLet :: Parser R.Term
 termLet = let_ *> termLetBlock
@@ -76,13 +79,13 @@ termPi :: Parser R.Term
 termPi =
   foldr (.) id <$ forall_
     <*> some (binder <&> \(pl, x, a) -> R.Pi pl x a) <* arrow
-    <*> term
+    <*> termPrec P.Arrow
 
 termLam :: Parser R.Term
 termLam =
   foldr (.) id <$ lambda
     <*> some (binder <&> \(pl, x, a) -> R.Lam pl x a) <* arrow
-    <*> term
+    <*> termPrec P.Arrow
 
 termRowLit :: Parser R.Term
 termRowLit =
