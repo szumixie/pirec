@@ -45,4 +45,5 @@ main = withUtf8 do
           embed $ hPutStr stderr perr *> exitFailure
     t <- normal t
     a <- prettyValue Ctx.empty a
-    embed . PP.putDoc $ prettyTerm t <> PP.line <> PP.indent 2 (PP.colon <+> a)
+    embed . PP.putDoc $
+      prettyTerm t <> PP.line <> PP.indent 2 (PP.colon <+> a) <> PP.line
