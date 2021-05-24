@@ -67,23 +67,16 @@ prettyTermWith !ctx = go
     RecordLit ts ->
       ("rec" <>) . align . encloseSep "{ " " }" ", " $
         itoList ts <&> \((x, _), t) -> pretty x <+> colon <+> go minBound t
-    RecordProj label index t ->
+    RecordProj lbl index t ->
       parensPrec P.Proj $
-        foldr ($) (go P.Proj t) (replicate index (<> "." <> pretty label))
+        foldr ($) (go P.Proj t) (replicate index (<> "." <> pretty lbl))
           <> dot
-          <> pretty label
-    RecordAlter ts u ->
-      ("rec" <>) . align $
-        encloseSep
-          "{ "
-          ( line <> " | "
-              <> foldr
-                (\label -> (<> ".-" <> pretty label))
-                (go P.Proj u)
-                restrs
-              <> " }"
-          )
-          ", "
+          <> pretty lbl
+    RecordAlter ts u
+      | null exts -> parensPrec P.Proj restrsPretty
+      | otherwise ->
+        ("rec" <>) . align
+          . encloseSep "{ " (line <> " | " <> restrsPretty <> " }") ", "
           $ exts <&> \(x, t) -> pretty x <+> equals <+> go minBound t
      where
       (restrs, exts) =
@@ -91,6 +84,10 @@ prettyTermWith !ctx = go
           & partitionWith \(x, mt) -> case mt of
             Nothing -> Left x
             Just t -> Right (x, t)
+      restrsPretty
+        | null restrs = go minBound u
+        | otherwise =
+          foldr (\lbl -> (<> ".-" <> pretty lbl)) (go P.Proj u) restrs
    where
     parensPrec prec' = if prec > prec' then parens else id
   goApp args = \case

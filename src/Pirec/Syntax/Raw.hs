@@ -3,6 +3,7 @@ module Pirec.Syntax.Raw (Term (..)) where
 import Relude
 
 import Pirec.Data.Span (Span)
+import Pirec.Label (Label)
 import Pirec.Plicity (Plicity)
 import Pirec.Var.Name (Name)
 
@@ -17,10 +18,10 @@ data Term
   | App Plicity Term Term
   | RowType Term
   | RowEmpty
-  | RowExt Name Term Term
+  | RowExt Label Term Term
   | RecordType Term
   | RecordEmpty
-  | RecordExt Name (Maybe Term) Term Term
-  | RecordProj Name Term
-  | RecordRestr Name Term
+  | RecordExt Label (Maybe Term) Term Term
+  | RecordProj Label Term
+  | RecordRestr Label Term
   deriving stock (Show)

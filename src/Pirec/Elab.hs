@@ -121,44 +121,44 @@ checkInfer = (goCheck, goInfer)
     R.RowEmpty -> do
       va <- elabEval =<< insertMeta
       pure (RowLit mempty, V.RowType va)
-    R.RowExt label t ts -> do
+    R.RowExt lbl t ts -> do
       (t, va) <- goInfer t
       ts <- goCheck ts (V.RowType va)
-      pure (RowExt (one (label, t)) ts, V.RowType va)
+      pure (RowExt (one (lbl, t)) ts, V.RowType va)
     R.RecordType r -> do
       r <- goCheck r (V.RowType V.Univ)
       pure (RecordType r, V.Univ)
     R.RecordEmpty -> do
       pure (RecordLit mempty, V.RecordType $ V.RowLit mempty)
-    R.RecordExt label a t u -> do
+    R.RecordExt lbl a t u -> do
       (t, va) <- optionalCheck t a
       (u, vp) <- goInfer u
       vr <- elabEval =<< insertMeta
       elabUnify vp (V.RecordType vr)
       pure
-        ( RecordAlter (MMA.singleInsert label t) u
-        , V.RecordType (V.rowExt (one (label, va)) vr)
+        ( RecordAlter (MMA.singleInsert lbl t) u
+        , V.RecordType (V.rowExt (one (lbl, va)) vr)
         )
-    R.RecordProj label t -> do
+    R.RecordProj lbl t -> do
       (t, vp) <- goInfer t
       va <-
         forceValue vp >>= \case
           V.RecordType (V.RowLit vas)
-            | Just va <- vas ^? ix (label, 0) -> pure va
+            | Just va <- vas ^? ix (lbl, 0) -> pure va
           V.RecordType (V.Neut _ (V.RowExt vas _))
-            | Just va <- vas ^? ix (label, 0) -> pure va
+            | Just va <- vas ^? ix (lbl, 0) -> pure va
           vp -> do
             va <- elabEval =<< insertMeta
             vr <- elabEval =<< insertMeta
-            elabUnify vp $ V.RecordType (V.rowExt (one (label, va)) vr)
+            elabUnify vp $ V.RecordType (V.rowExt (one (lbl, va)) vr)
             pure va
-      pure (RecordProj label 0 t, va)
-    R.RecordRestr label t -> do
+      pure (RecordProj lbl 0 t, va)
+    R.RecordRestr lbl t -> do
       (t, vp) <- goInfer t
       va <- elabEval =<< insertMeta
       vr <- elabEval =<< insertMeta
-      elabUnify vp $ V.RecordType (V.rowExt (one (label, va)) vr)
-      pure (RecordAlter (MMA.singleDelete label) t, V.RecordType vr)
+      elabUnify vp $ V.RecordType (V.rowExt (one (lbl, va)) vr)
+      pure (RecordAlter (MMA.singleDelete lbl) t, V.RecordType vr)
 
   optionalCheck t = \case
     Nothing -> goInfer t

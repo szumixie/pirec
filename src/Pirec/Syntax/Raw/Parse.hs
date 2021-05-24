@@ -94,17 +94,19 @@ termRowLit =
 termRecordLit :: Parser R.Term
 termRecordLit =
   recordLit *> rowBlock R.RecordEmpty do
-    label <- fieldLabel
-    let extend a = R.RecordExt label a <$ equals <*> term
+    (lbl, name) <- fieldLabelOrName
+    let extend a = R.RecordExt lbl a <$ equals <*> term
         modify a = do
           t <- coloneq *> term
-          pure $ R.RecordExt label a t . R.RecordRestr label
+          pure $ R.RecordExt lbl a t . R.RecordRestr lbl
     choice
       [ extend Nothing <|> modify Nothing
       , do
           a <- colon *> term
           extend (Just a) <|> modify (Just a)
-      , pure $ R.RecordExt label Nothing (R.Var label)
+      , case name of
+          Nothing -> empty
+          Just name -> pure $ R.RecordExt lbl Nothing (R.Var name)
       ]
 
 withSpan :: Parser R.Term -> Parser R.Term

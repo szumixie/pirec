@@ -3,6 +3,7 @@ module Pirec.Syntax.Raw.Parse.Lex (
   ident,
   binderIdent,
   fieldLabel,
+  fieldLabelOrName,
   indentBlock,
   parens,
   braces,
@@ -32,10 +33,12 @@ import Data.HashSet qualified as HSet
 import Data.IntSet qualified as ISet
 
 import Optics
-import Text.Megaparsec
+import Text.Megaparsec hiding (label)
+import Text.Megaparsec qualified as M
 import Text.Megaparsec.Char qualified as C
 import Text.Megaparsec.Char.Lexer qualified as L
 
+import Pirec.Label (Label, label)
 import Pirec.Syntax.Raw.Parse.Type
 import Pirec.Var.Name (Name, name)
 
@@ -95,27 +98,33 @@ keywords =
 keyword :: Text -> Parser Text
 keyword kw = lexeme $ chunk kw <* notFollowedBy (satisfy isIdentLetter)
 
-ident :: Parser Name
-ident = lexeme $ try do
+identText :: Parser Text
+identText = lexeme $ try do
   offset <- getOffset
   text <- takeWhile1P (Just "identifier") isIdentLetter
   if keywords ^. contains text
     then
-      region (setErrorOffset offset) . label "identifier" $
+      region (setErrorOffset offset) . M.label "identifier" $
         unexpected (Tokens $ text & toString & fromList)
-    else pure $ name text
+    else pure text
+
+ident :: Parser Name
+ident = name <$> identText
 
 binderIdent :: Parser Name
 binderIdent = ident <|> name <$> uscore
 
-fieldLabel :: Parser Name
-fieldLabel =
+fieldLabel :: Parser Label
+fieldLabel = fst <$> fieldLabelOrName
+
+fieldLabelOrName :: Parser (Label, Maybe Name)
+fieldLabelOrName =
   choice
-    [ ident
+    [ (label &&& Just . name) <$> identText
     , lexeme $
-        name . fromString <$ single '"' <*> manyTill L.charLiteral (single '"')
+        (,Nothing) . label . fromString <$ single '"'
+          <*> manyTill L.charLiteral (single '"')
     ]
-    <?> "field label"
 
 indentBlock :: (Parser () -> Parser a) -> Parser a
 indentBlock f =

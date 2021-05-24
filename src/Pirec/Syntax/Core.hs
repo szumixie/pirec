@@ -5,6 +5,7 @@ import Relude
 import Pirec.BoundMask (BoundMask)
 import Pirec.Data.MultiMap (MultiMap)
 import Pirec.Data.MultiMapAlter (MultiMapAlter)
+import Pirec.Label (Label)
 import Pirec.Plicity (Plicity)
 import Pirec.Var.Level (Level)
 import Pirec.Var.Meta (Meta)
@@ -19,10 +20,10 @@ data Term
   | Lam Plicity Name Term
   | App Plicity Term Term
   | RowType Term
-  | RowLit (MultiMap Name Term)
-  | RowExt (MultiMap Name Term) Term
+  | RowLit (MultiMap Label Term)
+  | RowExt (MultiMap Label Term) Term
   | RecordType Term
-  | RecordLit (MultiMap Name Term)
-  | RecordProj Name Int Term
-  | RecordAlter (MultiMapAlter Name Term) Term
+  | RecordLit (MultiMap Label Term)
+  | RecordProj Label Int Term
+  | RecordAlter (MultiMapAlter Label Term) Term
   deriving stock (Show)

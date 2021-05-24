@@ -53,7 +53,7 @@ eval env t = do
           RowExt ts row -> V.rowExt (go <$> ts) (go row)
           RecordType row -> V.RecordType (go row)
           RecordLit ts -> V.RecordLit (go <$> ts)
-          RecordProj label index t -> V.recordProj label index (go t)
+          RecordProj lbl index t -> V.recordProj lbl index (go t)
           RecordAlter ts u -> V.recordAlter (go <$> ts) (go u)
   pure $ goEnv env t
 
@@ -78,7 +78,7 @@ appSpine t = go
       spine <- go spine
       appValue pl spine u
     V.RowExt us spine -> V.rowExt us <$> go spine
-    V.RecordProj label index spine -> V.recordProj label index <$> go spine
+    V.RecordProj lbl index spine -> V.recordProj lbl index <$> go spine
     V.RecordAlter us spine -> V.recordAlter us <$> go spine
 
 forceValue :: Eff MetaLookup m => Value -> m Value
@@ -109,8 +109,8 @@ quoteWith quoteVar f = goAcc
                 V.Nil -> pure x
                 V.App pl spine t -> App pl <$> goSpine spine <*> go t
                 V.RowExt ts spine -> RowExt <$> traverse go ts <*> goSpine spine
-                V.RecordProj label index spine ->
-                  RecordProj label index <$> goSpine spine
+                V.RecordProj lbl index spine ->
+                  RecordProj lbl index <$> goSpine spine
                 V.RecordAlter ts spine ->
                   RecordAlter <$> traverse go ts <*> goSpine spine
           goSpine spine

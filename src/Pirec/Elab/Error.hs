@@ -10,7 +10,7 @@ import Control.Effect
 import Data.Text.Prettyprint.Doc
 import Optics
 import Prettyprinter.Render.String (renderString)
-import Text.Megaparsec hiding (label)
+import Text.Megaparsec
 
 import Pirec.Data.Span qualified as Span
 import Pirec.Elab.Context (Context)
