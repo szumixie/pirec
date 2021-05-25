@@ -13,7 +13,7 @@ import Pirec.Syntax.Precedence qualified as P
 import Pirec.Syntax.Raw qualified as R
 import Pirec.Syntax.Raw.Parse.Lex
 import Pirec.Syntax.Raw.Parse.Type
-import Pirec.Var.Name (Name)
+import Pirec.Var.Name (Name (..))
 
 parseRaw :: String -> Text -> Either (ParseErrorBundle Text Void) R.Term
 parseRaw = run $ space *> termLetBlock <* eof
@@ -62,7 +62,7 @@ termPrec !prec = label "expression" case prec of
    where
     go = withSpan do
       t <- termPrec (next prec)
-      option t $ R.Pi Explicit "_" (Just t) <$ arrow <*> go
+      option t $ R.Pi Explicit Wildcard (Just t) <$ arrow <*> go
 
 termLet :: Parser R.Term
 termLet = let_ *> termLetBlock

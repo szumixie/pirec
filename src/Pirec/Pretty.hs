@@ -49,7 +49,7 @@ prettyTermWith !ctx = go
       args = ctx ^. #env & toListOf (BM.masked mask % to pretty)
     t@Let{} -> prettyLet ctx t
     Univ -> "Type"
-    t@(Pi Explicit "_" _ _) -> parensPrec P.Arrow $ prettyFun ctx t
+    t@(Pi Explicit Wildcard _ _) -> parensPrec P.Arrow $ prettyFun ctx t
     t@Pi{} -> parensPrec P.Arrow $ prettyPi ctx t
     t@Lam{} -> parensPrec P.Arrow $ prettyLam ctx t
     t@App{} -> parensPrec P.App $ u <+> align (sep args)
@@ -113,7 +113,7 @@ prettyPi ctx t = align $ sep [forall_ <+> align (sep binders <+> arrow), u]
   (binders, u) = go ctx t
   go ctx = \case
     Pi pl (freshName (ctx ^. #names) -> x) a b
-      | pl == Implicit || x /= "_" ->
+      | pl == Implicit || x /= Wildcard ->
         go (ctx & Ctx.extend x) b
           & _1
             %~ (encl (pretty x <+> colon <+> prettyTermWith ctx minBound a) :)
@@ -127,9 +127,9 @@ prettyFun :: Context -> Term -> Doc ann
 prettyFun ctx t = align (sep $ go ctx t)
  where
   go ctx = \case
-    Pi Explicit "_" a b ->
+    Pi Explicit Wildcard a b ->
       prettyTermWith ctx (next P.Arrow) a <+> arrow :
-      go (ctx & Ctx.extend "_") b
+      go (ctx & Ctx.extend Wildcard) b
     t -> [prettyTermWith ctx P.Arrow t]
 
 prettyLam :: Context -> Term -> Doc ann
@@ -147,7 +147,7 @@ prettyLam ctx t = align $ sep [lambda <+> align (sep binders <+> arrow), u]
 
 freshName :: HashSet Name -> Name -> Name
 freshName names name@(Name x)
-  | name == "_" || not (names ^. contains name) = name
+  | name == Wildcard || not (names ^. contains name) = name
   | otherwise = go newIndex
  where
   (prefix, suffix) = TS.spanEnd isDigit x

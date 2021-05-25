@@ -40,7 +40,7 @@ import Text.Megaparsec.Char.Lexer qualified as L
 
 import Pirec.Label (Label, label)
 import Pirec.Syntax.Raw.Parse.Type
-import Pirec.Var.Name (Name, name)
+import Pirec.Var.Name (Name (..), name)
 
 lineComment :: Parser ()
 lineComment = L.skipLineComment "--"
@@ -112,7 +112,7 @@ ident :: Parser Name
 ident = name <$> identText
 
 binderIdent :: Parser Name
-binderIdent = ident <|> name <$> uscore
+binderIdent = ident <|> Wildcard <$ uscore
 
 fieldLabel :: Parser Label
 fieldLabel = fst <$> fieldLabelOrName
