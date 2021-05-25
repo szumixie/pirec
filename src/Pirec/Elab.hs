@@ -68,8 +68,8 @@ checkInfer = (goCheck, goInfer)
     (t, V.Pi Implicit x _ closure) -> do
       vb <- asks Ctx.level >>= \lvl -> openClosure lvl closure
       Lam Implicit x <$> local (Ctx.insert x) (goCheck t vb)
-    (t, va') -> do
-      (t, va) <- uncurry insertImplAppNoBeta =<< goInfer t
+    (t, va) -> do
+      (t, va') <- uncurry insertImplAppNoBeta =<< goInfer t
       t <$ elabUnify va va'
 
   goInfer = \case
