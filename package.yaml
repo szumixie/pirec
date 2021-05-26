@@ -109,6 +109,7 @@ dependencies:
 
   - prettyprinter
   - megaparsec
+  - parser-combinators
 
 _no-paths: &no-paths
   condition: false
@@ -126,7 +127,6 @@ _exe-options: &exe-options
 library:
   source-dirs: src
   when:
-    - *no-paths
     - condition: flag(release)
       ghc-options:
         - -Wunused-packages

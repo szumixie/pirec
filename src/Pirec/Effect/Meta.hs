@@ -16,6 +16,7 @@ import Relude
 
 import Data.HashTable.IO (BasicHashTable)
 import Data.HashTable.IO qualified as HT
+import Data.Map.Strict qualified as Map
 import Data.Vector.Unboxed.Mutable qualified as U
 import System.IO.Unsafe (unsafeDupablePerformIO)
 
@@ -60,19 +61,32 @@ type MetaCtxToIOC m a =
   ) =>
   MetaLookupC s1 (MetaStateC s2 m) a
 
-metaCtxToIO :: Eff (Embed IO) m => MetaCtxToIOC m a -> m a
+metaCtxToIO ::
+  Eff (Embed IO) m => MetaCtxToIOC m a -> m (a, [(Meta, Maybe Value)])
 metaCtxToIO m = do
-  nextRef :: U.IOVector Int <- embed $ U.replicate 1 1
+  nextRef :: U.IOVector Int <- embed $ U.replicate 1 0
   solveds :: BasicHashTable Meta Value <- embed HT.new
-  interpret
-    ( \case
-        FreshMeta -> embed do
-          next <- U.unsafeRead nextRef 0
-          Meta next <$ U.unsafeWrite nextRef 0 (next + 1)
-        SolveMeta meta t -> embed $ HT.insert solveds meta t
-    )
-    $ interpret
-      \case
-        MetaLookup -> pure $ unsafeDupablePerformIO . HT.lookup solveds
-      m
+  x <-
+    interpret
+      ( \case
+          FreshMeta -> embed do
+            next <- U.unsafeRead nextRef 0
+            Meta next <$ U.unsafeWrite nextRef 0 (next + 1)
+          SolveMeta meta t -> embed $ HT.insert solveds meta t
+      )
+      $ interpret
+        \case
+          MetaLookup -> pure $ unsafeDupablePerformIO . HT.lookup solveds
+        m
+  embed do
+    next <- U.unsafeRead nextRef 0
+    solvedList <- HT.toList solveds
+    pure
+      ( x
+      , Map.toAscList $
+          mconcat
+            [ Just <$> Map.fromList solvedList
+            , Map.fromDistinctAscList $ (,Nothing) <$> [0 .. Meta next - 1]
+            ]
+      )
 {-# INLINE metaCtxToIO #-}
