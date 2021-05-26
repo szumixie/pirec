@@ -19,6 +19,8 @@ ghc-options:
   - -Wprepositive-qualified-module
 
   - -Wno-name-shadowing
+  - -O2
+  - -funbox-strict-fields
   - -fplugin=Control.Effect.Plugin
 
 default-extensions:
@@ -126,10 +128,8 @@ _exe-options: &exe-options
 
 library:
   source-dirs: src
-  when:
-    - condition: flag(release)
-      ghc-options:
-        - -Wunused-packages
+  ghc-options:
+    - -Wunused-packages
 
 executables:
   pirec:
@@ -150,43 +150,3 @@ tests:
           - hspec-discover
           - hspec-hedgehog
           - hedgehog
-
-benchmarks:
-  bench-pirec:
-    source-dirs: benchmark
-    <<: *exe-options
-    when:
-      - *no-paths
-      - condition: true
-        dependencies:
-          - criterion
-
-flags:
-  release:
-    manual: true
-    default: false
-  dump:
-    manual: true
-    default: false
-
-when:
-  - condition: flag(release)
-    ghc-options:
-      - -O2
-      - -funbox-strict-fields
-  - condition: "!flag(release)"
-    dependencies:
-      - pretty-simple
-  - condition: flag(dump)
-    ghc-options:
-      - -ddump-to-file
-      - -dumpdir=.dumps
-      - -ddump-simpl
-      - -ddump-hi
-
-      - -dppr-case-as-let
-      - -dsuppress-uniques
-      - -dsuppress-idinfo
-      - -dsuppress-module-prefixes
-      - -dsuppress-type-applications
-      - -dsuppress-coercions

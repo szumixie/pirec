@@ -36,8 +36,8 @@ jobs:
             ${{ runner.os }}-
 
       - name: Install dependencies
-        run: stack build --flag pirec:release --test --bench --no-run-tests --no-run-benchmarks --only-dependencies
+        run: stack build --test --bench --no-run-tests --no-run-benchmarks --only-dependencies
       - name: Build
-        run: stack build --flag pirec:release --test --bench --no-run-tests --no-run-benchmarks
+        run: stack build --test --bench --no-run-tests --no-run-benchmarks
       - name: Test
-        run: stack test --flag pirec:release
+        run: stack test
