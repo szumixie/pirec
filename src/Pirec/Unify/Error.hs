@@ -46,5 +46,9 @@ prettyUnifyError ctx = \case
         <+> "in the context"
   Nonvariable t -> do
     t <- prettyValue ctx t
-    pure $ "got nonvariable in the context:" <> line <> indent 2 t
+    pure $
+      vsep
+        [ "got nonvariable in the context:"
+        , indent 2 t
+        ]
   NonInvertable -> pure "got non-invertable spine"

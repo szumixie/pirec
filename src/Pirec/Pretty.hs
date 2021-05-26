@@ -69,9 +69,11 @@ prettyTermWith !ctx = go
         itoList ts <&> \((x, _), t) -> pretty x <+> colon <+> go minBound t
     RecordProj lbl index t ->
       parensPrec P.Proj $
-        foldr ($) (go P.Proj t) (replicate index (<> "." <> pretty lbl))
-          <> dot
-          <> pretty lbl
+        mconcat
+          [ replicate index (<> "." <> pretty lbl) & foldr ($) (go P.Proj t)
+          , dot
+          , pretty lbl
+          ]
     RecordAlter ts u
       | null exts -> parensPrec P.Proj restrsPretty
       | otherwise ->
