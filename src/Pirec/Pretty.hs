@@ -76,7 +76,7 @@ prettyTermWith !ctx = go
       | null exts -> parensPrec P.Proj restrsPretty
       | otherwise ->
         ("rec" <>) . align
-          . encloseSep "{ " (line <> " | " <> restrsPretty <> " }") ", "
+          . encloseSep "{ " (line <> "| " <> restrsPretty <> " }") ", "
           $ exts <&> \(x, t) -> pretty x <+> equals <+> go minBound t
      where
       (restrs, exts) =
