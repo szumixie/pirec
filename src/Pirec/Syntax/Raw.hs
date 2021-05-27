@@ -16,6 +16,10 @@ data Term
   | Pi Plicity Name (Maybe Term) Term
   | Lam Plicity Name (Maybe Term) Term
   | App Plicity Term Term
+  | Sigma Name (Maybe Term) Term
+  | Pair Term Term
+  | Proj1 Term
+  | Proj2 Term
   | RowType Term
   | RowEmpty
   | RowExt Label Term Term

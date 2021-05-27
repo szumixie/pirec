@@ -5,6 +5,8 @@ module Pirec.Value (
   Spine (..),
   var,
   meta,
+  proj1,
+  proj2,
   rowExt,
   recordProj,
   recordAlter,
@@ -33,6 +35,8 @@ data Value
   | Univ
   | Pi Plicity Name ~Value Closure
   | Lam Plicity Name Closure
+  | Sigma Name ~Value Closure
+  | Pair Value ~Value
   | RowType Value
   | RowLit (MultiMap Label Value)
   | RecordType Value
@@ -47,6 +51,8 @@ data Var
 data Spine
   = Nil
   | App Plicity Spine ~Value
+  | Proj1 Spine
+  | Proj2 Spine
   | RowExt (MultiMap Label Value) Spine
   | RecordProj Label Int Spine
   | RecordAlter (MultiMapAlter Label Value) Spine
@@ -57,6 +63,18 @@ var lx = Neut (Rigid lx) Nil
 
 meta :: Meta -> Value
 meta mx = Neut (Flex mx) Nil
+
+proj1 :: Value -> Value
+proj1 = \case
+  Neut x spine -> Neut x $ Proj1 spine
+  Pair t _ -> t
+  _ -> error "bug"
+
+proj2 :: Value -> Value
+proj2 = \case
+  Neut x spine -> Neut x $ Proj2 spine
+  Pair _ u -> u
+  _ -> error "bug"
 
 rowExt :: MultiMap Label Value -> Value -> Value
 rowExt ts = \case

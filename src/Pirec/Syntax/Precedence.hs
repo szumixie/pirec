@@ -4,6 +4,8 @@ import Relude
 
 data Precedence
   = Arrow
+  | Times
+  | Comma
   | App
   | Proj
   | Atom

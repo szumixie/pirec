@@ -55,6 +55,22 @@ prettyTermWith !ctx = go
     t@App{} -> parensPrec P.App $ u <+> align (sep args)
      where
       (u, args) = goApp [] t
+      goApp args = \case
+        App pl t u -> goApp (arg : args) t
+         where
+          arg = case pl of
+            Explicit -> go (next P.App) u
+            Implicit -> braces (go minBound u)
+        t -> (go (next P.App) t, args)
+    t@(Sigma Wildcard _ _) -> parensPrec P.Times $ prettyProd ctx t
+    t@Sigma{} -> parensPrec P.Times $ prettySigma ctx t
+    t@Pair{} -> parensPrec P.Comma $ align (sep $ goPair t)
+     where
+      goPair = \case
+        Pair a b -> go (next P.Comma) a <+> comma : goPair b
+        t -> [go P.Comma t]
+    Proj1 t -> parensPrec P.App $ "proj1" <+> go (next P.App) t
+    Proj2 t -> parensPrec P.App $ "proj2" <+> go (next P.App) t
     RowType a -> parensPrec P.App $ "Row" <+> go (next P.App) a
     RowLit ts ->
       ("#" <>) . align . encloseSep "{ " " }" ", " $
@@ -92,13 +108,6 @@ prettyTermWith !ctx = go
           foldr (\lbl -> (<> ".-" <> pretty lbl)) (go P.Proj u) restrs
    where
     parensPrec prec' = if prec > prec' then parens else id
-  goApp args = \case
-    App pl t u -> goApp (arg : args) t
-     where
-      arg = case pl of
-        Explicit -> go (next P.App) u
-        Implicit -> braces (go minBound u)
-    t -> (go (next P.App) t, args)
 
 prettyLet :: Context -> Term -> Doc ann
 prettyLet ctx t = "let" <> align (encloseSep "{ " " }" "; " $ go ctx t)
@@ -147,6 +156,27 @@ prettyLam ctx t = align $ sep [lambda <+> align (sep binders <+> arrow), u]
         Implicit -> braces
     t -> ([], prettyTermWith ctx P.Arrow t)
 
+prettyProd :: Context -> Term -> Doc ann
+prettyProd ctx t = align (sep $ go ctx t)
+ where
+  go ctx = \case
+    Sigma Wildcard a b ->
+      prettyTermWith ctx (next P.Times) a <+> times :
+      go (ctx & Ctx.extend Wildcard) b
+    t -> [prettyTermWith ctx P.Times t]
+
+prettySigma :: Context -> Term -> Doc ann
+prettySigma ctx t = align $ sep [exists <+> align (sep binders <+> times), u]
+ where
+  (binders, u) = go ctx t
+  go ctx = \case
+    Sigma (freshName (ctx ^. #names) -> x) a b
+      | x /= Wildcard ->
+        go (ctx & Ctx.extend x) b
+          & _1
+            %~ (parens (pretty x <+> colon <+> prettyTermWith ctx minBound a) :)
+    t -> ([], prettyTermWith ctx P.Times t)
+
 freshName :: HashSet Name -> Name -> Name
 freshName names name@(Name x)
   | name == Wildcard || not (names ^. contains name) = name
@@ -163,11 +193,17 @@ freshName names name@(Name x)
    where
     newName = Name $ prefix <> TS.fromString (show i)
 
-forall_ :: Doc ann
-forall_ = "∀"
-
 arrow :: Doc ann
 arrow = "→"
 
+forall_ :: Doc ann
+forall_ = "∀"
+
 lambda :: Doc ann
 lambda = "λ"
+
+times :: Doc ann
+times = "×"
+
+exists :: Doc ann
+exists = "∃"

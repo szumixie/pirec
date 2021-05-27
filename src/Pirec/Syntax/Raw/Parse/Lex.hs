@@ -16,6 +16,11 @@ module Pirec.Syntax.Raw.Parse.Lex (
   arrow,
   forall_,
   lambda,
+  times,
+  exists,
+  comma,
+  proj1,
+  proj2,
   rowType,
   rowLit,
   pipe,
@@ -87,6 +92,13 @@ keywords =
     , "∀"
     , "forall"
     , "λ"
+    , "×"
+    , "&"
+    , "∃"
+    , "exists"
+    , ","
+    , "proj1"
+    , "proj2"
     , "Row"
     , "#"
     , "|"
@@ -152,6 +164,11 @@ semicolon
   , arrow
   , forall_
   , lambda
+  , times
+  , exists
+  , comma
+  , proj1
+  , proj2
   , rowType
   , rowLit
   , pipe
@@ -170,6 +187,11 @@ univ = keyword "Type"
 arrow = keyword "→" <|> keyword "->" <?> "arrow"
 forall_ = keyword "∀" <|> keyword "forall" <?> "forall"
 lambda = keyword "λ" <|> symbol "\\" <?> "lambda"
+times = keyword "×" <|> keyword "&" <?> "times"
+exists = keyword "∃" <|> keyword "exists" <?> "exists"
+comma = keyword ","
+proj1 = keyword "proj1"
+proj2 = keyword "proj2"
 rowType = keyword "Row"
 rowLit = keyword "#"
 pipe = keyword "|"

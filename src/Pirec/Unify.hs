@@ -64,6 +64,8 @@ unify !lvl = go
             (V.Nil, V.Nil) -> pass
             (V.App pl spine t, V.App pl' spine' t')
               | pl == pl' -> goSpine spine spine' *> go t t'
+            (V.Proj1 spine, V.Proj1 spine') -> goSpine spine spine'
+            (V.Proj2 spine, V.Proj2 spine') -> goSpine spine spine'
             (V.RowExt ts spine, V.RowExt ts' spine')
               | Just ms <- MM.match go ts ts' ->
                 sequenceA_ ms *> goSpine spine spine'
@@ -117,6 +119,16 @@ unify !lvl = go
         (V.Neut x spine, V.Lam pl _ closure) -> do
           t <- openClosure lvl closure
           unify (lvl + 1) (V.Neut x $ V.App pl spine (V.var lvl)) t
+        (V.Sigma _ a closure, V.Sigma _ a' closure') -> do
+          go a a'
+          b <- openClosure lvl closure
+          b' <- openClosure lvl closure'
+          unify (lvl + 1) b b'
+        (V.Pair t u, V.Pair t' u') -> go t t' *> go u u'
+        (V.Pair t u, V.Neut x spine) ->
+          go t (V.Neut x $ V.Proj1 spine) *> go u (V.Neut x $ V.Proj2 spine)
+        (V.Neut x spine, V.Pair t u) ->
+          go (V.Neut x $ V.Proj1 spine) t *> go (V.Neut x $ V.Proj2 spine) u
         (V.RowType a, V.RowType a') -> go a a'
         (V.RowLit ts, V.RowLit ts')
           | Just ms <- MM.match go ts ts' -> sequenceA_ ms

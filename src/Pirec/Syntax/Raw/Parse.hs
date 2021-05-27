@@ -34,6 +34,7 @@ termPrec !prec = label "expression" case prec of
             , R.Univ <$ univ
             , termPi
             , termLam
+            , termSigma
             , termRowLit
             , termRecordLit
             ]
@@ -53,16 +54,16 @@ termPrec !prec = label "expression" case prec of
       choice
         [ withSpan $
             choice
-              [ R.RowType <$ rowType <*> termPrec (next prec)
+              [ R.Proj1 <$ proj1 <*> termPrec (next prec)
+              , R.Proj2 <$ proj2 <*> termPrec (next prec)
+              , R.RowType <$ rowType <*> termPrec (next prec)
               , R.RecordType <$ recordType <*> termPrec (next prec)
               ]
         , termPrec (next prec)
         ]
-  P.Arrow -> go
-   where
-    go = withSpan do
-      t <- termPrec (next prec)
-      option t $ R.Pi Explicit Wildcard (Just t) <$ arrow <*> go
+  P.Comma -> infixRight prec (R.Pair <$ comma)
+  P.Times -> infixRight prec (R.Sigma Wildcard . Just <$ times)
+  P.Arrow -> infixRight prec (R.Pi Explicit Wildcard . Just <$ arrow)
 
 termLet :: Parser R.Term
 termLet = let_ *> termLetBlock
@@ -78,14 +79,20 @@ termLetBlock = indentBlock \sep -> do
 termPi :: Parser R.Term
 termPi =
   foldr (.) id <$ forall_
-    <*> some (binder <&> \(pl, x, a) -> R.Pi pl x a) <* arrow
+    <*> some (binderImpl <&> \(pl, x, a) -> R.Pi pl x a) <* arrow
     <*> termPrec P.Arrow
 
 termLam :: Parser R.Term
 termLam =
   foldr (.) id <$ lambda
-    <*> some (binder <&> \(pl, x, a) -> R.Lam pl x a) <* arrow
+    <*> some (binderImpl <&> \(pl, x, a) -> R.Lam pl x a) <* arrow
     <*> termPrec P.Arrow
+
+termSigma :: Parser R.Term
+termSigma =
+  foldr (.) id <$ exists
+    <*> some (uncurry R.Sigma <$> binder) <* times
+    <*> termPrec P.Times
 
 termRowLit :: Parser R.Term
 termRowLit =
@@ -126,8 +133,23 @@ suffixes p sf = do
   t <- p
   go t
 
-binder :: Parser (Plicity, Name, Maybe R.Term)
+infixRight :: Precedence -> Parser (R.Term -> R.Term -> R.Term) -> Parser R.Term
+infixRight prec op = go
+ where
+  go = do
+    t <- termPrec (next prec)
+    option t . withSpan $ op ?? t <*> go
+
+binder :: Parser (Name, Maybe R.Term)
 binder =
+  choice
+    [ parens $ (,) <$> binderIdent <*> optional (colon *> term)
+    , (,Nothing) <$> binderIdent
+    ]
+    <?> "binder"
+
+binderImpl :: Parser (Plicity, Name, Maybe R.Term)
+binderImpl =
   choice
     [ parens $ (Explicit,,) <$> binderIdent <*> optional (colon *> term)
     , braces $ (Implicit,,) <$> binderIdent <*> optional (colon *> term)

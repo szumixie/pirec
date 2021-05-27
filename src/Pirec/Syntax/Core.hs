@@ -19,6 +19,10 @@ data Term
   | Pi Plicity Name Term Term
   | Lam Plicity Name Term
   | App Plicity Term Term
+  | Sigma Name Term Term
+  | Pair Term Term
+  | Proj1 Term
+  | Proj2 Term
   | RowType Term
   | RowLit (MultiMap Label Term)
   | RowExt (MultiMap Label Term) Term

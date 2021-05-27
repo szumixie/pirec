@@ -48,6 +48,10 @@ eval env t = do
           Pi pl x a b -> V.Pi pl x (go a) (V.Closure env b)
           Lam pl x t -> V.Lam pl x (V.Closure env t)
           App pl t u -> appValuePure mlookup pl (go t) (go u)
+          Sigma x a b -> V.Sigma x (go a) (V.Closure env b)
+          Pair t u -> V.Pair (go t) (go u)
+          Proj1 t -> V.proj1 (go t)
+          Proj2 t -> V.proj2 (go t)
           RowType a -> V.RowType (go a)
           RowLit ts -> V.RowLit (go <$> ts)
           RowExt ts row -> V.rowExt (go <$> ts) (go row)
@@ -77,6 +81,8 @@ appSpine t = go
     V.App pl spine u -> do
       spine <- go spine
       appValue pl spine u
+    V.Proj1 spine -> V.proj1 <$> go spine
+    V.Proj2 spine -> V.proj2 <$> go spine
     V.RowExt us spine -> V.rowExt us <$> go spine
     V.RecordProj lbl index spine -> V.recordProj lbl index <$> go spine
     V.RecordAlter us spine -> V.recordAlter us <$> go spine
@@ -108,6 +114,8 @@ quoteWith quoteVar f = goAcc
           let goSpine = \case
                 V.Nil -> pure x
                 V.App pl spine t -> App pl <$> goSpine spine <*> go t
+                V.Proj1 spine -> Proj1 <$> goSpine spine
+                V.Proj2 spine -> Proj2 <$> goSpine spine
                 V.RowExt ts spine -> RowExt <$> traverse go ts <*> goSpine spine
                 V.RecordProj lbl index spine ->
                   RecordProj lbl index <$> goSpine spine
@@ -117,6 +125,8 @@ quoteWith quoteVar f = goAcc
         V.Univ -> pure Univ
         V.Pi pl x a closure -> Pi pl x <$> go a <*> goClosure closure
         V.Lam pl x closure -> Lam pl x <$> goClosure closure
+        V.Sigma x a closure -> Sigma x <$> go a <*> goClosure closure
+        V.Pair t u -> Pair <$> go t <*> go u
         V.RowType a -> RowType <$> go a
         V.RowLit ts -> RowLit <$> traverse go ts
         V.RecordType row -> RecordType <$> go row
