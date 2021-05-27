@@ -71,7 +71,8 @@ termLet = let_ *> termLetBlock
 termLetBlock :: Parser R.Term
 termLetBlock = indentBlock \sep -> do
   fs <- many do
-    (x, hasType) <- try $ (,) <$> ident <*> (True <$ colon <|> False <$ equals)
+    (x, hasType) <-
+      try $ (,) <$> binderIdent <*> (True <$ colon <|> False <$ equals)
     a <- if hasType then Just <$> term <* equals else pure Nothing
     R.Let x a <$> term <* sep
   foldr (.) id fs <$> term
@@ -158,8 +159,7 @@ binderImpl =
     <?> "binder"
 
 rowBlock :: R.Term -> Parser (R.Term -> R.Term) -> Parser R.Term
-rowBlock empty field = indentBlock \sep -> do
-  fs <- field `sepBy` sep
-  r <-
-    if null fs then pure empty else option empty $ optional sep *> pipe *> term
+rowBlock empty field = indentBlock \sep -> option empty do
+  fs <- field `sepBy1` sep
+  r <- option empty (optional sep *> pipe *> term)
   pure $ foldr ($) r fs
