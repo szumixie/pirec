@@ -126,5 +126,5 @@ unify !lvl = go
         (V.RecordLit ts, t'@V.Neut{}) ->
           ifor_ ts \(lbl, index) t -> go t (V.recordProj lbl index t')
         (t@V.Neut{}, V.RecordLit ts') ->
-          ifor_ ts' \(lbl, index) t' -> go (V.recordProj lbl index t') t
+          ifor_ ts' \(lbl, index) t' -> go (V.recordProj lbl index t) t'
         (t, t') -> throw $ Mismatch t t'
