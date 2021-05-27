@@ -68,8 +68,8 @@ symbol = lexeme . chunk
 specialChars :: IntSet
 specialChars = ISet.fromList $ fromEnum <$> "(){};\\.\""
 
-isIdentLetter :: Char -> Bool
-isIdentLetter c
+isIdentChar :: Char -> Bool
+isIdentChar c
   | C.isAlphaNum c || C.isMark c = True
   | specialChars ^. contains (fromEnum c) = False
   | otherwise = C.isPunctuation c || C.isSymbol c
@@ -96,12 +96,12 @@ keywords =
     ]
 
 keyword :: Text -> Parser Text
-keyword kw = lexeme $ chunk kw <* notFollowedBy (satisfy isIdentLetter)
+keyword kw = lexeme $ chunk kw <* notFollowedBy (satisfy isIdentChar)
 
 identText :: Parser Text
 identText = lexeme $ try do
   offset <- getOffset
-  text <- takeWhile1P (Just "identifier") isIdentLetter
+  text <- takeWhile1P (Just "identifier") isIdentChar
   if keywords ^. contains text
     then
       region (setErrorOffset offset) . M.label "identifier" $
