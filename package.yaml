@@ -150,3 +150,6 @@ tests:
           - hspec-discover
           - hspec-hedgehog
           - hedgehog
+
+          - directory
+          - silently

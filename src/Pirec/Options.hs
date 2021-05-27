@@ -1,4 +1,4 @@
-module Pirec.Options (Options (..), Input (..), getOpts) where
+module Pirec.Options (Options (..), Input (..), defaultOpts, getOpts) where
 
 import Relude
 
@@ -26,6 +26,9 @@ declareFieldLabels
       }
       deriving stock (Show)
     |]
+
+defaultOpts :: Input -> Options
+defaultOpts input = Options input True True True False
 
 getOpts :: IO Options
 getOpts =
