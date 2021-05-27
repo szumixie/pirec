@@ -1,14 +1,13 @@
-module Pirec (main) where
+module Pirec (main, mainWith, mainWithInput) where
 
 import Relude hiding (runReader)
-import Relude.Extra.Tuple (traverseToFst)
+import Relude.Extra.Tuple (traverseToSnd)
 
 import Data.Text.IO qualified as Text
 import Data.Text.IO.Utf8 qualified as Utf8
 import Data.Traversable (for)
 import Main.Utf8 (withUtf8)
 import System.IO (hPutStr)
-import System.IO.Utf8 qualified as Utf8
 
 import Control.Effect
 import Control.Effect.Error
@@ -30,13 +29,16 @@ import Pirec.Syntax.Raw.Parse (parseRaw)
 import Pirec.Options
 
 main :: IO ()
-main = mainWith =<< getOpts
+main = withUtf8 $ mainWith =<< getOpts
 
 mainWith :: Options -> IO ()
-mainWith opts = withUtf8 do
-  (input, fp) <- case opts ^. #input of
-    File fp -> traverseToFst Utf8.readFile fp
-    Stdin -> (,"<stdin>") <$> Utf8.withHandle stdin Text.getContents
+mainWith opts =
+  uncurry (mainWithInput opts) =<< case opts ^. #input of
+    File fp -> traverseToSnd Utf8.readFile fp
+    Stdin -> ("<stdin>",) <$> Text.getContents
+
+mainWithInput :: Options -> FilePath -> Text -> IO ()
+mainWithInput opts fp input = do
   raw <- case parseRaw fp input of
     Right raw -> pure raw
     Left err -> hPutStr stderr (MP.errorBundlePretty err) *> exitFailure
