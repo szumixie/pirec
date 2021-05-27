@@ -23,28 +23,9 @@ term = termPrec minBound
 
 termPrec :: Precedence -> Parser R.Term
 termPrec !prec = label "expression" case prec of
-  P.Atom ->
-    choice
-      [ parens term
-      , withSpan $
-          choice
-            [ R.Var <$> ident
-            , R.Hole <$ uscore
-            , termLet
-            , R.Univ <$ univ
-            , termPi
-            , termLam
-            , termSigma
-            , termRowLit
-            , termRecordLit
-            ]
-      ]
-  P.Proj ->
-    suffixes (termPrec $ next prec) . label "record projection" $
-      choice
-        [ R.RecordRestr <$ dotminus <*> fieldLabel
-        , R.RecordProj <$ dot <*> fieldLabel
-        ]
+  P.Arrow -> infixRight prec (R.Pi Explicit Wildcard . Just <$ arrow)
+  P.Times -> infixRight prec (R.Sigma Wildcard . Just <$ times)
+  P.Comma -> infixRight prec (R.Pair <$ comma)
   P.App -> suffixes fun do
     (pl, u) <-
       braces ((Implicit,) <$> term) <|> (Explicit,) <$> termPrec (next prec)
@@ -61,9 +42,28 @@ termPrec !prec = label "expression" case prec of
               ]
         , termPrec (next prec)
         ]
-  P.Comma -> infixRight prec (R.Pair <$ comma)
-  P.Times -> infixRight prec (R.Sigma Wildcard . Just <$ times)
-  P.Arrow -> infixRight prec (R.Pi Explicit Wildcard . Just <$ arrow)
+  P.Proj ->
+    suffixes (termPrec $ next prec) . label "record projection" $
+      choice
+        [ R.RecordRestr <$ dotminus <*> fieldLabel
+        , R.RecordProj <$ dot <*> fieldLabel
+        ]
+  P.Atom ->
+    choice
+      [ parens term
+      , withSpan $
+          choice
+            [ R.Var <$> ident
+            , R.Hole <$ uscore
+            , termLet
+            , R.Univ <$ univ
+            , termPi
+            , termLam
+            , termSigma
+            , termRowLit
+            , termRecordLit
+            ]
+      ]
 
 termLet :: Parser R.Term
 termLet = let_ *> termLetBlock
