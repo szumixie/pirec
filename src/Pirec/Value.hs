@@ -98,7 +98,7 @@ recordAlter :: MultiMapAlter Label Value -> Value -> Value
 recordAlter ts = \case
   Neut x spine -> Neut x case spine of
     RecordAlter us spine ->
-      maybe id RecordAlter (guarded (not . null) (ts <> us)) spine
+      maybe id RecordAlter (guarded (not . MMA.isId) (ts <> us)) spine
     _ -> RecordAlter ts spine
   RecordLit us -> RecordLit (MMA.apply ts us)
   _ -> error "bug"

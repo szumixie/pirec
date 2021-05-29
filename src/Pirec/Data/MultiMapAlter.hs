@@ -1,5 +1,6 @@
 module Pirec.Data.MultiMapAlter (
   MultiMapAlter,
+  isId,
   singleInsert,
   singleDelete,
   apply,
@@ -64,6 +65,9 @@ instance (Eq k, Hashable k) => Semigroup (MultiMapAlter k a) where
 
 instance (Eq k, Hashable k) => Monoid (MultiMapAlter k a) where
   mempty = MultiMapAlter mempty
+
+isId :: MultiMapAlter k a -> Bool
+isId (MultiMapAlter m) = null m
 
 singleInsert :: Hashable k => k -> a -> MultiMapAlter k a
 singleInsert k x = MultiMapAlter $ one (k, elemInsert (one x))
