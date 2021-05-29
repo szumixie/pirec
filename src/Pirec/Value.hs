@@ -35,7 +35,7 @@ data Value
   | Univ
   | Pi Plicity Name ~Value Closure
   | Lam Plicity Name Closure
-  | Sigma Name ~Value Closure
+  | Sigma Name Value Closure
   | Pair Value ~Value
   | RowType Value
   | RowLit (MultiMap Label Value)
