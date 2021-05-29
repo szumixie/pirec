@@ -1,0 +1,2 @@
+id : ∀ {A} → A → A = λ a → a
+id rec{}

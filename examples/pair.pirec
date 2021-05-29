@@ -1,0 +1,9 @@
+Pair : Type → Type → Type = λ A B → Rec #{ 1 : A; 2 : B }
+pair : ∀ {A} {B} → A → B → Pair A B = λ x y → rec{ 1 = x; 2 = y }
+uncurry : ∀ {A} {B} (P : Pair A B → Type) →
+          (∀ (x : A) (y : B) → P (pair x y)) → ∀ p → P p
+        = λ _ f p → f p.1 p.2
+rec
+  Pair
+  pair
+  uncurry

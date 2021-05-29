@@ -1,0 +1,10 @@
+Nat  = ∀ {A} → Rec #{ z : A; s : A → A } → A
+zero : Nat = λ r → r.z
+suc  : Nat → Nat = λ x r → r.s (x r)
+List = λ A → ∃ (x : Nat)
+             × Rec (x rec z = #{}
+                          s = λ (R : Row Type) → #{ e : A | R })
+nil  : ∀ {A} → List A = zero , rec{}
+cons : ∀ {A} → A → List A → List A
+     = λ x xs → suc (proj1 xs) , rec{ e = x | proj2 xs }
+cons {Nat} (suc (suc zero)) (cons {Nat} (suc zero) nil)

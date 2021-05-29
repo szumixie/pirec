@@ -1,0 +1,6 @@
+Nat  : Type = ∀ {A} → (A → A) → A → A
+zero : Nat  = λ _ x → x
+suc  : Nat → Nat = λ n f x → f (n f x)
+add : Nat → Nat → Nat = λ x y s z → x s (y s z)
+mul : Nat → Nat → Nat = λ x y s z → x (y s) z
+add (suc zero) (mul (suc (suc zero)) (suc (suc (suc zero))))

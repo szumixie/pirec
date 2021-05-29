@@ -1,0 +1,56 @@
+{-
+
+Hurkens' paradox [1, 2]
+
+[1] Antonius J. C. Hurkens. “A Simplification of Girard’s Paradox”. In: Typed
+Lambda Calculi and Applications, Second International Conference on Typed Lambda
+Calculiand Applications, TLCA ’95, Edinburgh, UK, April 10–12, 1995,
+Proceedings. Ed. by Mariangiola Dezani-Ciancaglini and Gordon D. Plotkin. Vol.
+902. Lecture Notes in Computer Science. Springer, 1995, pp. 266–278. DOI:
+10.1007/BFb0014058
+
+[2] Ulf Norell. [Agda] A Plea For Set:Set. URL:
+https://lists.chalmers.se/pipermail/agda/2008/000316.html.
+
+-}
+
+⊥ : Type
+  = ∀ (A : Type) → A
+
+¬ : Type → Type
+  = λ A → A → ⊥
+
+P : Type → Type
+  = λ A → A → Type
+
+U : Type
+  = ∀ (X : Type) → (P (P X) → X) → P (P X)
+
+τ : P (P U) → U
+  = λ t X f p → t λ x → p (f (x X f))
+
+σ : U → P (P U)
+  = λ s → s U λ t → τ t
+
+Δ : P U
+  = λ y → ¬ (∀ p → σ y p → p (τ (σ y)))
+
+Ω : U
+  = τ λ p → ∀ x → σ x p → p x
+
+D : Type
+  = ∀ p → σ Ω p → p (τ (σ Ω))
+
+lem₁ : ∀ (p : P U) → (∀ (x : U) → σ x p → p x) → p Ω
+     = λ p H1 → H1 Ω λ x → H1 (τ (σ x))
+
+lem₂ : ¬ D
+     = lem₁ Δ λ x H2 H3 → H3 Δ H2 λ p → H3 λ y → p (τ (σ y))
+
+lem₃ : D
+     = λ p → lem₁ λ y → p (τ (σ y))
+
+loop : ⊥
+     = lem₂ lem₃
+
+loop

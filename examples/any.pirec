@@ -1,0 +1,6 @@
+Any = ∃ (A : Type) × A
+unit : Any = Type , Type
+test : Type = proj2 unit
+rec
+  Any
+  unit
