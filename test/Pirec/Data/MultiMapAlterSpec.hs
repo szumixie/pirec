@@ -89,7 +89,7 @@ spec = parallel do
       xs <- forAll $ multiMapAlter 500 int
       ys <- forAll $ multiMapAlter 500 int
       assert $ maybe True MMA.valid (MMA.match (,) xs ys)
-    specify "self" $ hedgehog do
+    specify "self match" $ hedgehog do
       xs <- forAll $ multiMapAlter 1000 int
       MMA.match (,) xs xs === Just (dup <$> xs)
   describe "ifoldedAlter" do

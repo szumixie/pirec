@@ -86,7 +86,7 @@ spec = parallel do
       xs <- forAll $ multiMap 500 int
       ys <- forAll $ multiMap 500 int
       assert $ maybe True MM.valid (MM.match (,) xs ys)
-    specify "self" $ hedgehog do
+    specify "self match" $ hedgehog do
       xs <- forAll $ multiMap 1000 int
       MM.match (,) xs xs === Just (dup <$> xs)
   describe "difference" do
@@ -95,7 +95,7 @@ spec = parallel do
       ys <- forAll $ assocList 500 int
       validToAscList (MM.difference (fromList xs) (fromList ys))
         === Just (sortWith fst $ List.deleteFirstsBy ((==) `on` fst) xs ys)
-    specify "left" $ hedgehog do
+    specify "left division" $ hedgehog do
       xs <- forAll $ multiMap 500 int
       ys <- forAll $ multiMap 500 int
       MM.difference (xs <> ys) xs === ys
@@ -116,6 +116,6 @@ spec = parallel do
       xs <- forAll $ multiMap 500 int
       ys <- forAll $ multiMap 500 int
       MM.superDifference (xs <> ys) xs === Just ys
-    specify "self" $ hedgehog do
+    specify "self difference" $ hedgehog do
       xs <- forAll $ multiMap 1000 int
       MM.superDifference xs xs === Just mempty
