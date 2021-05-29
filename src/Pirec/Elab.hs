@@ -81,9 +81,9 @@ checkInfer = (goCheck, goInfer)
       t <- goCheck t va
       u <- goCheck u =<< appClosure closure =<< evalCtx t
       pure $ Pair t u
-    (t, va) -> do
-      (t, va') <- uncurry insertImplAppNoBeta =<< goInfer t
-      t <$ elabUnify va va'
+    (t, expected) -> do
+      (t, inferred) <- uncurry insertImplAppNoBeta =<< goInfer t
+      t <$ elabUnify inferred expected
 
   goInfer = \case
     R.Span span t -> local (Ctx.span .~ span) (goInfer t)

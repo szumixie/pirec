@@ -25,15 +25,15 @@ data UnifyError
 
 prettyUnifyError :: Eff MetaLookup m => Context -> UnifyError -> m (Doc ann)
 prettyUnifyError ctx = \case
-  Mismatch a a' -> do
-    a <- prettyValue ctx a
-    a' <- prettyValue ctx a'
+  Mismatch inferred expected -> do
+    inferred <- prettyValue ctx inferred
+    expected <- prettyValue ctx expected
     pure $
       vsep
         [ "expected type:"
-        , indent 2 a
+        , indent 2 expected
         , "but got inferred type:"
-        , indent 2 a'
+        , indent 2 inferred
         ]
   ScopeError meta lvl -> do
     x <- prettyValue ctx $ V.var lvl

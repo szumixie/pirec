@@ -58,17 +58,17 @@ instance ShowErrorComponent CompElabError where
     renderString . layoutPretty defaultLayoutOptions . run $ runMetaLookup
       mlookup
       case err of
-        UnifyError a a' uerr -> do
+        UnifyError inferred expected uerr -> do
           puerr <- prettyUnifyError ctx uerr
-          a <- prettyValue ctx a
-          a' <- prettyValue ctx a'
+          inferred <- prettyValue ctx inferred
+          expected <- prettyValue ctx expected
           pure $
             vsep
               [ puerr
               , "when unifying expected type:"
-              , indent 2 a
+              , indent 2 expected
               , "with inferred type:"
-              , indent 2 a'
+              , indent 2 inferred
               ]
         ScopeError x -> pure $ "variable" <+> pretty x <+> "out of scope"
         PlicityMismatch pl pl' ->
