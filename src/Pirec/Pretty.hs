@@ -77,7 +77,7 @@ prettyTermWith !ctx = go
         itoList ts <&> \((x, _), t) -> pretty x <+> colon <+> go minBound t
     RowExt ts r ->
       ("#" <>) . align
-        . encloseSep "{ " (line <> " | " <> go minBound r <> " }") ", "
+        . encloseSep "{ " (line <> "| " <> go minBound r <> " }") ", "
         $ itoList ts <&> \((x, _), t) -> pretty x <+> colon <+> go minBound t
     RecordType r -> parensPrec P.App $ "Rec" <+> go (next P.App) r
     RecordLit ts ->
