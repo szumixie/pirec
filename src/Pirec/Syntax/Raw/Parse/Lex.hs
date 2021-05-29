@@ -61,7 +61,7 @@ space = L.space C.space1 lineComment blockComment
 lexeme :: Parser a -> Parser a
 lexeme p = do
   lineStart <- use #lineStart
-  _ <- L.indentGuard pass (if lineStart then EQ else GT) =<< gview #blockIndent
+  _ <- indentGuard (if lineStart then EQ else GT)
   x <- p
   assign #lexemeEnd =<< getOffset
   assign #lineStart False
@@ -138,13 +138,22 @@ fieldLabelOrName =
           <*> manyTill L.charLiteral (single '"')
     ]
 
+indentGuard :: Ordering -> Parser Pos
+indentGuard ordering = do
+  blockIndent <- gview #blockIndent
+  if blockIndent <= 0
+    then case ordering of
+      LT -> fail "bug"
+      _ -> L.indentLevel
+    else L.indentGuard pass ordering (mkPos blockIndent)
+
 indentBlock :: (Parser () -> Parser a) -> Parser a
 indentBlock f =
   choice
     [ braces $ f (void semicolon) <* optional semicolon
     , do
-        blockIndent <- L.indentLevel
-        local (#blockIndent .~ blockIndent) $
+        blockIndent <- indentGuard GT
+        local (#blockIndent .~ unPos blockIndent) $
           assign #lineStart True *> f (assign #lineStart True)
     ]
     <?> "indented block"

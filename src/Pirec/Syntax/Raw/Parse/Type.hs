@@ -4,12 +4,11 @@ import Relude
 
 import Optics
 import Text.Megaparsec
-import Text.Megaparsec.Char.Lexer qualified as L
 
 declareFieldLabels
   [d|
     newtype ParseContext = ParseContext
-      { blockIndent :: Pos
+      { blockIndent :: Int
       }
       deriving stock (Show)
     |]
@@ -28,6 +27,5 @@ type Parser = ReaderT ParseContext (StateT ParseState (Parsec Void Text))
 run :: Parser a -> FilePath -> Text -> Either (ParseErrorBundle Text Void) a
 run p = parse do
   lexemeEnd <- getOffset
-  blockIndent <- L.indentLevel
-  p & usingReaderT (ParseContext blockIndent)
+  p & usingReaderT (ParseContext 0)
     & evaluatingStateT (ParseState lexemeEnd True)
