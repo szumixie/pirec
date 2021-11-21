@@ -5,7 +5,7 @@ import Relude
 import Data.Text.Short (ShortText)
 import Data.Text.Short qualified as TS
 
-import Data.Text.Prettyprint.Doc (Pretty, pretty)
+import Prettyprinter (Pretty, pretty)
 
 newtype Name = Name ShortText
   deriving newtype (Show, IsString, Eq, Hashable)

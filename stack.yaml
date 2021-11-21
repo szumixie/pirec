@@ -1,4 +1,4 @@
-resolver: lts-17.13
+resolver: lts-18.17
 packages:
   - .
 extra-deps:
@@ -8,7 +8,6 @@ extra-deps:
   - optics-core-0.4
   - optics-extra-0.4
   - optics-th-0.4
-  - indexed-traversable-instances-0.1
 
-  - in-other-words-0.2.0.0
+  - in-other-words-0.2.1.0
   - in-other-words-plugin-0.1.0.0

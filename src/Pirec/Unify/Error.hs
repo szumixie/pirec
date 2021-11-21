@@ -3,7 +3,7 @@ module Pirec.Unify.Error (UnifyError (..), prettyUnifyError) where
 import Relude
 
 import Control.Effect
-import Data.Text.Prettyprint.Doc
+import Prettyprinter
 
 import Pirec.Value (Value)
 import Pirec.Value qualified as V

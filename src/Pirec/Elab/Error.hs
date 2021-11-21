@@ -7,8 +7,8 @@ module Pirec.Elab.Error (
 import Relude
 
 import Control.Effect
-import Data.Text.Prettyprint.Doc
 import Optics
+import Prettyprinter
 import Prettyprinter.Render.String (renderString)
 import Text.Megaparsec
 
