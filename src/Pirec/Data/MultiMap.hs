@@ -1,19 +1,20 @@
 module Pirec.Data.MultiMap (
   MultiMap (..),
-  match,
+  intersectionWith,
+  matchWith,
   difference,
-  superDifference,
+  isSubsetOf,
   valid,
 ) where
 
-import Relude
+import Relude hiding (Alt, catMaybes, mapMaybe)
 
 import Data.Align
+import Data.Functor.Plus
 import Data.HashMap.Strict qualified as M
-import Data.Sequence qualified as Seq
-import Data.These
 import Data.These.Optics
 import GHC.Exts qualified
+import Witherable
 
 import Optics
 
@@ -23,13 +24,28 @@ newtype MultiMap k a = MultiMap (HashMap k (Seq a))
   deriving
     (FunctorWithIndex (k, Int), FoldableWithIndex (k, Int), Semialign, Align)
     via (Compose (HashMap k) Seq)
+  deriving anyclass
+    (Witherable, FilterableWithIndex (k, Int), WitherableWithIndex (k, Int))
 
 valid :: MultiMap k a -> Bool
-valid (MultiMap xs) = not $ any null xs
+valid (MultiMap m) = not $ any null m
 
 instance TraversableWithIndex (k, Int) (MultiMap k) where
   itraverse f =
     fmap (coerce @(Compose (HashMap _) Seq _)) . itraverse f . coerce
+
+instance (Eq k, Hashable k) => Filterable (MultiMap k) where
+  mapMaybe f (MultiMap m) =
+    MultiMap $ mapMaybe (guarded (not . null) . mapMaybe f) m
+
+instance (Eq k, Hashable k) => Apply (MultiMap k) where
+  liftF2 = intersectionWith
+
+instance (Eq k, Hashable k) => Alt (MultiMap k) where
+  (<!>) = (<>)
+
+instance (Eq k, Hashable k) => Plus (MultiMap k) where
+  zero = mempty
 
 instance (Eq k, Hashable k) => Semigroup (MultiMap k a) where
   (<>) = coerce $ M.unionWith @k @(Seq a) (<>)
@@ -53,28 +69,24 @@ instance (Eq k, Hashable k) => Ixed (MultiMap k a) where
   ix (k, i) = coercedTo @(HashMap k (Seq a)) % ix k % ix i
   {-# INLINE ix #-}
 
-match ::
+intersectionWith ::
+  (Eq k, Hashable k) =>
+  (a -> b -> c) ->
+  MultiMap k a ->
+  MultiMap k b ->
+  MultiMap k c
+intersectionWith f mx my = mapMaybe (previews _These $ uncurry f) $ align mx my
+
+matchWith ::
   (Eq k, Hashable k) =>
   (a -> b -> c) ->
   MultiMap k a ->
   MultiMap k b ->
   Maybe (MultiMap k c)
-match f xs ys = traverse (previews _These (uncurry f)) (align xs ys)
-
-elemDifference :: These (Seq a) (Seq b) -> Maybe (Maybe (Seq a))
-elemDifference = \case
-  This xs -> Just $ Just xs
-  That _ -> Nothing
-  These xs ys -> case length xs `compare` length ys of
-    LT -> Nothing
-    EQ -> Just Nothing
-    GT -> Just . Just $ Seq.drop (length ys) xs
+matchWith f mx my = traverse (previews _These $ uncurry f) $ align mx my
 
 difference :: (Eq k, Hashable k) => MultiMap k a -> MultiMap k b -> MultiMap k a
-difference (MultiMap xs) (MultiMap ys) =
-  MultiMap $ M.mapMaybe (join . elemDifference) (align xs ys)
+difference mx my = mapMaybe (preview _This) $ align mx my
 
-superDifference ::
-  (Eq k, Hashable k) => MultiMap k a -> MultiMap k b -> Maybe (MultiMap k a)
-superDifference (MultiMap xs) (MultiMap ys) =
-  MultiMap . M.mapMaybe id <$> traverse elemDifference (align xs ys)
+isSubsetOf :: (Eq k, Hashable k) => MultiMap k a -> MultiMap k b -> Bool
+isSubsetOf mx my = all (has there) $ align mx my

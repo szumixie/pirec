@@ -1,10 +1,12 @@
 module Pirec.Data.MultiMapSpec (spec, int, assocList, multiMap) where
 
-import Relude hiding (uncons)
+import Relude hiding (catMaybes, filter, mapMaybe, uncons)
 import Relude.Extra.Tuple (dup)
 
+import Data.Functor.Plus
 import Data.List qualified as List
 import GHC.Exts qualified as Exts
+import Witherable
 
 import Optics
 
@@ -35,6 +37,22 @@ spec = parallel do
   specify "fromList/toList" $ hedgehog do
     xs <- forAll $ assocList 1000 int
     validToAscList (fromList xs) === Just (sortWith fst xs)
+  describe "Filterable" do
+    specify "catMaybes" $ hedgehog do
+      xs <- forAll $ assocList 1000 (G.maybe int)
+      validToAscList (catMaybes $ fromList xs)
+        === Just (sortWith fst $ xs & mapMaybe \(k, mx) -> (k,) <$> mx)
+    specify "identity" $ hedgehog do
+      xs <- forAll $ multiMap 1000 int
+      mapMaybe Just xs === xs
+  describe "Apply" do
+    specify "associativity" $ hedgehog do
+      xs <- forAll $ multiMap 300 int
+      ys <- forAll $ multiMap 300 int
+      zs <- forAll $ multiMap 300 int
+      let assoc ((x, y), z) = (x, (y, z))
+      (assoc <$> liftF2 (,) (liftF2 (,) xs ys) zs)
+        === liftF2 (,) xs (liftF2 (,) ys zs)
   describe "Semigroup" do
     specify "<>" $ hedgehog do
       xs <- forAll $ assocList 500 int
@@ -81,14 +99,22 @@ spec = parallel do
                 | otherwise -> t : go (j + 1) ys
         validToAscList (set (ix (k, i)) x (fromList xs))
           === Just (sortWith fst $ go 0 xs)
-  describe "match" do
+  describe "intersectionWith" do
     specify "validity" $ hedgehog do
       xs <- forAll $ multiMap 500 int
       ys <- forAll $ multiMap 500 int
-      assert $ maybe True MM.valid (MM.match (,) xs ys)
+      assert $ MM.valid (MM.intersectionWith (,) xs ys)
+    specify "self intersection" $ hedgehog do
+      xs <- forAll $ multiMap 1000 int
+      MM.intersectionWith (,) xs xs === (dup <$> xs)
+  describe "matchWith" do
+    specify "validity" $ hedgehog do
+      xs <- forAll $ multiMap 500 int
+      ys <- forAll $ multiMap 500 int
+      assert $ maybe True MM.valid (MM.matchWith (,) xs ys)
     specify "self match" $ hedgehog do
       xs <- forAll $ multiMap 1000 int
-      MM.match (,) xs xs === Just (dup <$> xs)
+      MM.matchWith (,) xs xs === Just (dup <$> xs)
   describe "difference" do
     specify "specification" $ hedgehog do
       xs <- forAll $ assocList 500 int
@@ -102,20 +128,12 @@ spec = parallel do
     specify "self difference" $ hedgehog do
       xs <- forAll $ multiMap 1000 int
       MM.difference xs xs === mempty
-  describe "superDifference" do
-    specify "validity" $ hedgehog do
-      xs <- forAll $ multiMap 500 int
-      ys <- forAll $ multiMap 500 int
-      assert $ maybe True MM.valid (MM.superDifference xs ys)
-    specify "superset specification" $ hedgehog do
+  describe "isKeySubsetOf" do
+    specify "specification" $ hedgehog do
       xs <- forAll $ assocList 500 int
       ys <- forAll $ assocList 500 int
-      isJust (MM.superDifference (fromList xs) (fromList ys))
-        === null (List.deleteFirstsBy ((==) `on` fst) ys xs)
-    specify "left division" $ hedgehog do
-      xs <- forAll $ multiMap 500 int
-      ys <- forAll $ multiMap 500 int
-      MM.superDifference (xs <> ys) xs === Just ys
-    specify "self difference" $ hedgehog do
+      fromList xs `MM.isSubsetOf` fromList ys
+        === sort (fst <$> xs) `List.isSubsequenceOf` sort (fst <$> ys)
+    specify "self subset" $ hedgehog do
       xs <- forAll $ multiMap 1000 int
-      MM.superDifference xs xs === Just mempty
+      assert $ xs `MM.isSubsetOf` xs

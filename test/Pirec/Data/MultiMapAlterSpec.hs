@@ -84,14 +84,14 @@ spec = parallel do
       i <- forAll $ G.int (R.linear 0 10)
       MMA.lookup k i (allDelete @Int ks)
         === Left (i + length (filter (== k) ks))
-  describe "match" do
+  describe "matchWith" do
     specify "validity" $ hedgehog do
       xs <- forAll $ multiMapAlter 500 int
       ys <- forAll $ multiMapAlter 500 int
-      assert $ maybe True MMA.valid (MMA.match (,) xs ys)
+      assert $ maybe True MMA.valid (MMA.matchWith (,) xs ys)
     specify "self match" $ hedgehog do
       xs <- forAll $ multiMapAlter 1000 int
-      MMA.match (,) xs xs === Just (dup <$> xs)
+      MMA.matchWith (,) xs xs === Just (dup <$> xs)
   describe "ifoldedAlter" do
     specify "all insert" $ hedgehog do
       xs <- forAll $ assocList 1000 int

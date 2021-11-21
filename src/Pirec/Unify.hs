@@ -67,28 +67,32 @@ unify !lvl = go
             (V.Proj1 spine, V.Proj1 spine') -> goSpine spine spine'
             (V.Proj2 spine, V.Proj2 spine') -> goSpine spine spine'
             (V.RowExt ts spine, V.RowExt ts' spine')
-              | Just ms <- MM.match go ts ts' ->
+              | Just ms <- MM.matchWith go ts ts' ->
                 sequenceA_ ms *> goSpine spine spine'
             (V.RecordProj lbl index spine, V.RecordProj lbl' index' spine')
               | lbl == lbl' && index == index' -> goSpine spine spine'
             (V.RecordAlter ts spine, V.RecordAlter ts' spine')
-              | Just ms <- MMA.match go ts ts' ->
+              | Just ms <- MMA.matchWith go ts ts' ->
                 sequenceA_ ms *> goSpine spine spine'
             (spine, spine') ->
               throw $ Mismatch (V.Neut x spine) (V.Neut x' spine')
         (V.Neut x (V.RowExt ts spine), V.Neut x' (V.RowExt ts' spine'))
-          | Just ms <- MM.match go ts ts' ->
+          | Just ms <- MM.matchWith go ts ts' ->
             sequenceA_ ms *> go (V.Neut x spine) (V.Neut x' spine')
         ( V.Neut (V.Flex mx) (V.RowExt ts spine)
           , V.Neut x' (V.RowExt ts' spine')
           )
-            | Just ts' <- MM.superDifference ts' ts ->
-              solve lvl mx spine $ V.Neut x' (V.RowExt ts' spine')
+            | ts `MM.isSubsetOf` ts' -> do
+              solve lvl mx spine $
+                V.Neut x' (V.RowExt (MM.difference ts' ts) spine')
+              sequenceA_ $ MM.intersectionWith go ts ts'
         ( V.Neut x (V.RowExt ts spine)
           , V.Neut (V.Flex mx') (V.RowExt ts' spine')
           )
-            | Just ts <- MM.superDifference ts ts' ->
-              solve lvl mx' spine' $ V.Neut x (V.RowExt ts spine)
+            | ts' `MM.isSubsetOf` ts -> do
+              solve lvl mx' spine' $
+                V.Neut x (V.RowExt (MM.difference ts ts') spine)
+              sequenceA_ $ MM.intersectionWith go ts ts'
         ( V.Neut (V.Flex mx) (V.RowExt ts spine)
           , V.Neut (V.Flex mx') (V.RowExt ts' spine')
           ) -> do
@@ -97,10 +101,13 @@ unify !lvl = go
               V.Neut (V.Flex mnew) (V.RowExt (MM.difference ts' ts) spine')
             solve lvl mx' spine' $
               V.Neut (V.Flex mnew) (V.RowExt (MM.difference ts ts') spine)
-        (V.Neut (V.Flex mx) (V.RowExt ts spine), V.RowLit ts') ->
+            sequenceA_ $ MM.intersectionWith go ts ts'
+        (V.Neut (V.Flex mx) (V.RowExt ts spine), V.RowLit ts') -> do
           solve lvl mx spine $ V.RowLit (MM.difference ts' ts)
-        (V.RowLit ts, V.Neut (V.Flex mx) (V.RowExt ts' spine)) ->
+          sequenceA_ $ MM.intersectionWith go ts ts'
+        (V.RowLit ts, V.Neut (V.Flex mx) (V.RowExt ts' spine)) -> do
           solve lvl mx spine $ V.RowLit (MM.difference ts ts')
+          sequenceA_ $ MM.intersectionWith go ts ts'
         (V.Neut (V.Flex mx) spine, t) -> solve lvl mx spine t
         (t, V.Neut (V.Flex mx) spine) -> solve lvl mx spine t
         (V.Univ, V.Univ) -> pass
@@ -131,10 +138,10 @@ unify !lvl = go
           go (V.Neut x $ V.Proj1 spine) t *> go (V.Neut x $ V.Proj2 spine) u
         (V.RowType a, V.RowType a') -> go a a'
         (V.RowLit ts, V.RowLit ts')
-          | Just ms <- MM.match go ts ts' -> sequenceA_ ms
+          | Just ms <- MM.matchWith go ts ts' -> sequenceA_ ms
         (V.RecordType va, V.RecordType va') -> go va va'
         (V.RecordLit ts, V.RecordLit ts')
-          | Just ms <- MM.match go ts ts' -> sequenceA_ ms
+          | Just ms <- MM.matchWith go ts ts' -> sequenceA_ ms
         (V.RecordLit ts, t'@V.Neut{}) ->
           ifor_ ts \(lbl, index) t -> go t (V.recordProj lbl index t')
         (t@V.Neut{}, V.RecordLit ts') ->

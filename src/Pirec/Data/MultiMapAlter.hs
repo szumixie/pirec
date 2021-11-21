@@ -5,7 +5,7 @@ module Pirec.Data.MultiMapAlter (
   singleDelete,
   apply,
   lookup,
-  match,
+  matchWith,
   ifoldedAlter,
   valid,
 ) where
@@ -89,13 +89,13 @@ lookup k i (MultiMapAlter m) =
     Nothing -> Left i
     Just (ElemAlter j xs) -> xs ^? ix i & maybeToRight (i - length xs + j)
 
-match ::
+matchWith ::
   (Eq k, Hashable k) =>
   (a -> b -> c) ->
   MultiMapAlter k a ->
   MultiMapAlter k b ->
   Maybe (MultiMapAlter k c)
-match f (MultiMapAlter mx) (MultiMapAlter my) =
+matchWith f (MultiMapAlter mx) (MultiMapAlter my) =
   coerce $ for (align mx my) \case
     These (ElemAlter i xs) (ElemAlter j ys)
       | i == j && length xs == length ys ->
